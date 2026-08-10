@@ -1,0 +1,18 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root{
+  --iemesp-blue: #013655;
+  --iemesp-teal: #0f7f72;
+  --iemesp-cream: #EBE9DA;
+  --iemesp-burgundy: #6C0F1A;
+}
+
+body{
+  @apply bg-[var(--iemesp-cream)] text-gray-900 font-poppins;
+}
+
+.container{
+  max-width: 640px;
+}
