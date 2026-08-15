@@ -8,9 +8,9 @@ export default function App(){
         <div className="rounded-[2rem] bg-white p-8 shadow-2xl">
           <div className="mb-8 text-center">
             <div className="inline-flex items-center rounded-full bg-iemesp-900/10 px-4 py-2 text-sm font-semibold text-iemesp-900">
-              IEMESP • Emergência Médica
+              IEMESP • Emergência por emergencistas
             </div>
-            <h1 className="mt-6 text-4xl font-poppins font-bold text-iemesp-900">Formulário de Captação de Leads</h1>
+            <h1 className="mt-6 text-4xl font-poppins font-bold text-iemesp-900">Formulário de Inscrição</h1>
             <p className="mt-4 text-base leading-7 text-slate-600">Preencha seus dados para receber informações sobre cursos e eventos da IEMESP.</p>
           </div>
 
