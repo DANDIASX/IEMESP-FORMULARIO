@@ -1,7 +1,8 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
 type Tipo = 'b2c' | 'b2b'
+type ProdutoInteresse = 'curso_pratico' | 'plataforma' | 'ambos'
 
 const formatPhone = (v: string) => {
   const d = v.replace(/\D/g, '')
@@ -11,14 +12,31 @@ const formatPhone = (v: string) => {
   return `(${d.slice(0,2)}) ${d.slice(2,7)}-${d.slice(7,11)}`
 }
 
+const getUtmParams = () => {
+  const params = new URLSearchParams(window.location.search)
+  return {
+    utm_source: params.get('utm_source'),
+    utm_medium: params.get('utm_medium'),
+    utm_campaign: params.get('utm_campaign'),
+  }
+}
+
 export default function LeadForm(){
   const [tipo, setTipo] = useState<Tipo>('b2c')
+  const [produtoInteresse, setProdutoInteresse] = useState<ProdutoInteresse>('curso_pratico')
+  const [utm, setUtm] = useState<{ utm_source: string | null; utm_medium: string | null; utm_campaign: string | null }>({
+    utm_source: null, utm_medium: null, utm_campaign: null
+  })
   const [form, setForm] = useState<any>({
-    nome: '', email: '', telefone: '', crm: '', formacao: '', especializacao: '', trabalho: '', residencia: '', curso_interesse: '', instituicao: '', cargo: '' , consentimento_lgpd: false
+    nome: '', email: '', telefone: '', crm: '', formacao: '', especializacao: '', trabalho: '', residencia: '', instituicao: '', cargo: '' , consentimento_lgpd: false
   })
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    setUtm(getUtmParams())
+  }, [])
 
   const handleChange = (k: string, v: any) => setForm((s:any)=>({ ...s, [k]: v }))
 
@@ -44,11 +62,14 @@ export default function LeadForm(){
       especializacao: form.especializacao || null,
       trabalho: form.trabalho || null,
       residencia: form.residencia || null,
-      curso_interesse: form.curso_interesse || null,
+      produto_interesse: produtoInteresse,
       instituicao: tipo === 'b2b' ? (form.instituicao || null) : null,
       cargo: tipo === 'b2b' ? (form.cargo || null) : null,
       origem: 'formulario',
-      consentimento_lgpd: form.consentimento_lgpd
+      consentimento_lgpd: form.consentimento_lgpd,
+      utm_source: utm.utm_source,
+      utm_medium: utm.utm_medium,
+      utm_campaign: utm.utm_campaign,
     }
 
     try{
@@ -131,8 +152,21 @@ export default function LeadForm(){
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700">Curso de interesse</label>
-        <input className="mt-1 block w-full rounded border-gray-300 p-2" value={form.curso_interesse} onChange={e=>handleChange('curso_interesse', e.target.value)} />
+        <label className="block text-sm font-medium text-gray-700">Tenho interesse em *</label>
+        <div className="mt-2 space-y-2">
+          <label className="flex items-start gap-2">
+            <input type="radio" name="produto_interesse" className="mt-1" checked={produtoInteresse==='curso_pratico'} onChange={()=>setProdutoInteresse('curso_pratico')} />
+            <span>Curso Procedimentos 2.0 (presencial)</span>
+          </label>
+          <label className="flex items-start gap-2">
+            <input type="radio" name="produto_interesse" className="mt-1" checked={produtoInteresse==='plataforma'} onChange={()=>setProdutoInteresse('plataforma')} />
+            <span>Plataforma de Educação Permanente (online)</span>
+          </label>
+          <label className="flex items-start gap-2">
+            <input type="radio" name="produto_interesse" className="mt-1" checked={produtoInteresse==='ambos'} onChange={()=>setProdutoInteresse('ambos')} />
+            <span>Os dois</span>
+          </label>
+        </div>
       </div>
 
       {tipo === 'b2b' && (
