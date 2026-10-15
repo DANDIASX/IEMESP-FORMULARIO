@@ -12,6 +12,7 @@ type CriarPagamentoBody = {
   telefone?: string
   consentimento_lgpd?: boolean
   utms?: Record<string, unknown>
+  metodo?: 'cartao' | 'pix'
 }
 
 Deno.serve(async (req: Request) => {
@@ -34,8 +35,10 @@ Deno.serve(async (req: Request) => {
   const email = body.email?.trim()
   const telefone = body.telefone?.trim()
 
-  if (!cursoSlug || !nome || !email || !telefone) {
-    return jsonResponse(req, { error: 'Preencha nome, e-mail e telefone.' }, 400)
+  const metodo = body.metodo === 'pix' ? 'pix' : body.metodo === 'cartao' ? 'cartao' : null
+
+  if (!cursoSlug || !nome || !email || !telefone || !metodo) {
+    return jsonResponse(req, { error: 'Preencha nome, e-mail, telefone e escolha a forma de pagamento.' }, 400)
   }
   if (body.consentimento_lgpd !== true) {
     return jsonResponse(req, { error: 'É necessário aceitar o consentimento LGPD.' }, 400)
@@ -46,7 +49,10 @@ Deno.serve(async (req: Request) => {
   if (!resultado.ok) {
     return jsonResponse(req, { error: resultado.mensagem }, resultado.status)
   }
-  const { curso, cupom, desconto_centavos, preco_final_centavos } = resultado
+  const { curso, cupom } = resultado
+  const precoEscolhido = metodo === 'pix' ? resultado.pix : resultado.cartao
+  const precoOriginalEscolhido = metodo === 'pix' ? (curso.preco_pix_centavos ?? curso.preco_centavos) : curso.preco_centavos
+  const { desconto_centavos, preco_final_centavos } = precoEscolhido
 
   // Vincula a um lead já existente pelo e-mail, ou cria um novo.
   const { data: leadExistente } = await supabaseAdmin
@@ -95,12 +101,13 @@ Deno.serve(async (req: Request) => {
       nome,
       email,
       telefone,
-      preco_original_centavos: curso.preco_centavos,
+      preco_original_centavos: precoOriginalEscolhido,
       desconto_centavos,
       valor_final_centavos: preco_final_centavos,
       status: 'pendente',
       utms: body.utms ?? null,
       consentimento_lgpd: true,
+      metodo_pagamento: metodo,
     }])
     .select('id')
     .single()
@@ -141,10 +148,17 @@ Deno.serve(async (req: Request) => {
         },
         auto_return: 'approved',
         notification_url: `${supabaseUrl}/functions/v1/webhook-mercadopago`,
-        payment_methods: {
-          installments: curso.max_parcelas,
-          excluded_payment_types: [{ id: 'ticket' }],
-        },
+        payment_methods: metodo === 'pix'
+          ? {
+              // Só Pix: cada método tem seu próprio preço, então uma preferência
+              // nunca pode deixar o comprador escolher outro método aqui.
+              installments: 1,
+              excluded_payment_types: [{ id: 'ticket' }, { id: 'credit_card' }, { id: 'debit_card' }],
+            }
+          : {
+              installments: curso.max_parcelas,
+              excluded_payment_types: [{ id: 'ticket' }, { id: 'bank_transfer' }],
+            },
       }),
     })
 

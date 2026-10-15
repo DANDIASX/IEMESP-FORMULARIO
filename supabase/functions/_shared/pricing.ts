@@ -5,8 +5,11 @@ export type Curso = {
   slug: string
   titulo: string
   preco_centavos: number
+  preco_pix_centavos: number | null
   max_parcelas: number
 }
+
+type PrecoCalculado = { desconto_centavos: number; preco_final_centavos: number }
 
 export type PriceResolution =
   | { ok: false; status: number; mensagem: string; curso?: Curso }
@@ -14,23 +17,44 @@ export type PriceResolution =
       ok: true
       curso: Curso
       cupom: { id: string } | null
-      desconto_centavos: number
-      preco_final_centavos: number
+      cartao: PrecoCalculado
+      pix: PrecoCalculado
     }
 
-// Nunca cobrar abaixo disso, mesmo com cupom de 100% ou valor_fixo maior que o preço.
+// Nunca cobrar abaixo disso, mesmo com cupom de 100% ou valor_fixo/preco_fixo maior que o preço.
 const PRECO_MINIMO_CENTAVOS = 100
 
 export function escapeLike(value: string): string {
   return value.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_')
 }
 
+type Cupom = { id: string; tipo: 'percentual' | 'valor_fixo' | 'preco_fixo'; valor: string | number }
+
+function aplicarCupom(baseCentavos: number, cupom: Cupom | null): PrecoCalculado {
+  if (!cupom) return { desconto_centavos: 0, preco_final_centavos: baseCentavos }
+
+  let precoFinal: number
+  if (cupom.tipo === 'percentual') {
+    precoFinal = baseCentavos - Math.round((baseCentavos * Number(cupom.valor)) / 100)
+  } else if (cupom.tipo === 'preco_fixo') {
+    precoFinal = Math.round(Number(cupom.valor) * 100)
+  } else {
+    precoFinal = baseCentavos - Math.round(Number(cupom.valor) * 100)
+  }
+
+  // Nunca abaixo do piso, nem acima do preço original (um cupom nunca aumenta o preço).
+  precoFinal = Math.min(Math.max(precoFinal, PRECO_MINIMO_CENTAVOS), baseCentavos)
+  return { desconto_centavos: baseCentavos - precoFinal, preco_final_centavos: precoFinal }
+}
+
 // Única fonte de verdade pro cálculo de preço — usada por validar-cupom E
 // criar-pagamento, pra nunca ter duas contas divergentes do mesmo desconto.
+// Calcula os dois preços (cartão e Pix) de uma vez, já que o checkout mostra
+// os dois antes do comprador escolher como pagar.
 export async function resolvePrice(cursoSlug: string, codigo?: string | null): Promise<PriceResolution> {
   const { data: curso, error: cursoError } = await supabaseAdmin
     .from('cursos')
-    .select('id, slug, titulo, preco_centavos, max_parcelas')
+    .select('id, slug, titulo, preco_centavos, preco_pix_centavos, max_parcelas')
     .eq('slug', cursoSlug)
     .eq('ativo', true)
     .maybeSingle()
@@ -39,9 +63,17 @@ export async function resolvePrice(cursoSlug: string, codigo?: string | null): P
     return { ok: false, status: 404, mensagem: 'Curso não encontrado ou indisponível.' }
   }
 
+  const precoPixBase = curso.preco_pix_centavos ?? curso.preco_centavos
   const codigoNormalizado = codigo?.trim()
+
   if (!codigoNormalizado) {
-    return { ok: true, curso, cupom: null, desconto_centavos: 0, preco_final_centavos: curso.preco_centavos }
+    return {
+      ok: true,
+      curso,
+      cupom: null,
+      cartao: { desconto_centavos: 0, preco_final_centavos: curso.preco_centavos },
+      pix: { desconto_centavos: 0, preco_final_centavos: precoPixBase },
+    }
   }
 
   const { data: cupom } = await supabaseAdmin
@@ -65,19 +97,11 @@ export async function resolvePrice(cursoSlug: string, codigo?: string | null): P
     return { ok: false, status: 400, mensagem: 'Cupom inválido ou expirado.', curso }
   }
 
-  const descontoBruto =
-    cupom!.tipo === 'percentual'
-      ? Math.round((curso.preco_centavos * Number(cupom!.valor)) / 100)
-      : Math.round(Number(cupom!.valor) * 100)
-
-  const precoFinal = Math.max(curso.preco_centavos - descontoBruto, PRECO_MINIMO_CENTAVOS)
-  const descontoEfetivo = curso.preco_centavos - precoFinal
-
   return {
     ok: true,
     curso,
     cupom: { id: cupom!.id },
-    desconto_centavos: descontoEfetivo,
-    preco_final_centavos: precoFinal,
+    cartao: aplicarCupom(curso.preco_centavos, cupom as Cupom),
+    pix: aplicarCupom(precoPixBase, cupom as Cupom),
   }
 }

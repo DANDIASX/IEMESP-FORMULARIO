@@ -33,6 +33,7 @@ Deno.serve(async (req: Request) => {
         ? {
             titulo: resultado.curso.titulo,
             preco_original_centavos: resultado.curso.preco_centavos,
+            preco_pix_original_centavos: resultado.curso.preco_pix_centavos ?? resultado.curso.preco_centavos,
             max_parcelas: resultado.curso.max_parcelas,
           }
         : null,
@@ -44,9 +45,10 @@ Deno.serve(async (req: Request) => {
     curso: {
       titulo: resultado.curso.titulo,
       preco_original_centavos: resultado.curso.preco_centavos,
+      preco_pix_original_centavos: resultado.curso.preco_pix_centavos ?? resultado.curso.preco_centavos,
       max_parcelas: resultado.curso.max_parcelas,
     },
-    desconto_centavos: resultado.desconto_centavos,
-    preco_final_centavos: resultado.preco_final_centavos,
+    cartao: resultado.cartao,
+    pix: resultado.pix,
   })
 })
