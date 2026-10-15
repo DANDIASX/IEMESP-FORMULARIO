@@ -1,0 +1,17 @@
+project_id = "iemesp-formulario"
+
+# O Mercado Pago não envia um token JWT do Supabase nas notificações de
+# webhook, então essa é a única função que precisa desligar a verificação
+# de JWT na borda. As outras 3 são chamadas pelo navegador via
+# supabase.functions.invoke(), que já manda a anon key automaticamente.
+[functions.webhook-mercadopago]
+verify_jwt = false
+
+[functions.validar-cupom]
+verify_jwt = true
+
+[functions.criar-pagamento]
+verify_jwt = true
+
+[functions.status-pedido]
+verify_jwt = true

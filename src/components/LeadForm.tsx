@@ -1,41 +1,31 @@
 import React, { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { trackLead } from '../lib/metaPixel'
+import { getAttribution, type Attribution } from '../lib/attribution'
+import { formatPhone } from '../lib/phone'
+import PaymentCTA from './PaymentCTA'
 
 type Tipo = 'b2c' | 'b2b'
 type ProdutoInteresse = 'curso_pratico' | 'plataforma' | 'ambos'
 
-const formatPhone = (v: string) => {
-  const d = v.replace(/\D/g, '')
-  if (d.length <= 2) return d
-  if (d.length <= 6) return `(${d.slice(0,2)}) ${d.slice(2)}`
-  if (d.length <= 10) return `(${d.slice(0,2)}) ${d.slice(2,6)}-${d.slice(6)}`
-  return `(${d.slice(0,2)}) ${d.slice(2,7)}-${d.slice(7,11)}`
-}
-
-const getUtmParams = () => {
-  const params = new URLSearchParams(window.location.search)
-  return {
-    utm_source: params.get('utm_source'),
-    utm_medium: params.get('utm_medium'),
-    utm_campaign: params.get('utm_campaign'),
-  }
-}
-
 export default function LeadForm(){
   const [tipo, setTipo] = useState<Tipo>('b2c')
   const [produtoInteresse, setProdutoInteresse] = useState<ProdutoInteresse>('curso_pratico')
-  const [utm, setUtm] = useState<{ utm_source: string | null; utm_medium: string | null; utm_campaign: string | null }>({
-    utm_source: null, utm_medium: null, utm_campaign: null
+  const [attribution, setAttribution] = useState<Attribution>({
+    utm_source: null, utm_medium: null, utm_campaign: null, utm_content: null, utm_term: null,
+    gclid: null, fbclid: null, first_landing_page: null, referrer: null
   })
   const [form, setForm] = useState<any>({
-    nome: '', email: '', telefone: '', crm: '', formacao: '', especializacao: '', trabalho: '', residencia: '', instituicao: '', cargo: '' , consentimento_lgpd: false
+    nome: '', email: '', telefone: '', crm: '', formacao: '', especializacao: '', trabalho: '', residencia: '', instituicao: '', cargo: '' , consentimento_lgpd: false,
+    como_conheceu: '', disponibilidade: '', objetivo: ''
   })
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [leadId, setLeadId] = useState<string | null>(null)
 
   useEffect(() => {
-    setUtm(getUtmParams())
+    setAttribution(getAttribution())
   }, [])
 
   const handleChange = (k: string, v: any) => setForm((s:any)=>({ ...s, [k]: v }))
@@ -52,7 +42,9 @@ export default function LeadForm(){
     setError(null)
     if(!validate()) return
     setLoading(true)
+    const newLeadId = crypto.randomUUID()
     const payload = {
+      id: newLeadId,
       tipo,
       nome: form.nome,
       email: form.email || null,
@@ -65,11 +57,20 @@ export default function LeadForm(){
       produto_interesse: produtoInteresse,
       instituicao: tipo === 'b2b' ? (form.instituicao || null) : null,
       cargo: tipo === 'b2b' ? (form.cargo || null) : null,
+      como_conheceu: form.como_conheceu || null,
+      disponibilidade: produtoInteresse !== 'plataforma' ? (form.disponibilidade || null) : null,
+      objetivo: form.objetivo || null,
       origem: 'formulario',
       consentimento_lgpd: form.consentimento_lgpd,
-      utm_source: utm.utm_source,
-      utm_medium: utm.utm_medium,
-      utm_campaign: utm.utm_campaign,
+      utm_source: attribution.utm_source,
+      utm_medium: attribution.utm_medium,
+      utm_campaign: attribution.utm_campaign,
+      utm_content: attribution.utm_content,
+      utm_term: attribution.utm_term,
+      gclid: attribution.gclid,
+      fbclid: attribution.fbclid,
+      first_landing_page: attribution.first_landing_page,
+      referrer: attribution.referrer,
     }
 
     try{
@@ -77,7 +78,9 @@ export default function LeadForm(){
       const { data, error: supError } = await supabase.from('leads').insert([payload])
       console.log('Resposta supabase:', { data, supError })
       if(supError) throw supError
+      setLeadId(newLeadId)
       setSuccess(true)
+      trackLead()
     }catch(err:any){
       console.error('Erro ao enviar lead:', err)
       // Mostrar mensagem útil para debugging
@@ -92,11 +95,22 @@ export default function LeadForm(){
     <div className="p-6 bg-white rounded shadow text-center">
       <h2 className="text-2xl font-poppins font-bold text-iemesp-900 mb-4">Recebemos seu contato</h2>
       <p>Em breve retornamos.</p>
+      {leadId && <PaymentCTA leadId={leadId} produto={produtoInteresse} />}
     </div>
   )
 
   return (
     <form onSubmit={onSubmit} className="p-6 bg-white rounded shadow space-y-4">
+      <input type="hidden" name="utm_source" value={attribution.utm_source ?? ''} />
+      <input type="hidden" name="utm_medium" value={attribution.utm_medium ?? ''} />
+      <input type="hidden" name="utm_campaign" value={attribution.utm_campaign ?? ''} />
+      <input type="hidden" name="utm_content" value={attribution.utm_content ?? ''} />
+      <input type="hidden" name="utm_term" value={attribution.utm_term ?? ''} />
+      <input type="hidden" name="gclid" value={attribution.gclid ?? ''} />
+      <input type="hidden" name="fbclid" value={attribution.fbclid ?? ''} />
+      <input type="hidden" name="first_landing_page" value={attribution.first_landing_page ?? ''} />
+      <input type="hidden" name="referrer" value={attribution.referrer ?? ''} />
+
       <div>
         <label className="block text-sm font-medium text-gray-700">Tipo</label>
         <div className="flex gap-4 mt-2">
@@ -152,6 +166,18 @@ export default function LeadForm(){
       </div>
 
       <div>
+        <label className="block text-sm font-medium text-gray-700">Como você conheceu a IEMESP?</label>
+        <select className="mt-1 block w-full rounded border-gray-300 p-2" value={form.como_conheceu} onChange={e=>handleChange('como_conheceu', e.target.value)}>
+          <option value="">Selecione</option>
+          <option value="instagram">Instagram</option>
+          <option value="indicacao">Indicação de colega/amigo</option>
+          <option value="google">Google</option>
+          <option value="whatsapp">WhatsApp</option>
+          <option value="outro">Outro</option>
+        </select>
+      </div>
+
+      <div>
         <label className="block text-sm font-medium text-gray-700">Tenho interesse em *</label>
         <div className="mt-2 space-y-2">
           <label className="flex items-start gap-2">
@@ -167,6 +193,24 @@ export default function LeadForm(){
             <span>Os dois</span>
           </label>
         </div>
+      </div>
+
+      {produtoInteresse !== 'plataforma' && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700">Disponibilidade para o curso presencial</label>
+          <select className="mt-1 block w-full rounded border-gray-300 p-2" value={form.disponibilidade} onChange={e=>handleChange('disponibilidade', e.target.value)}>
+            <option value="">Selecione</option>
+            <option value="proximos_30_dias">Próximos 30 dias</option>
+            <option value="1_a_3_meses">Entre 1 e 3 meses</option>
+            <option value="3_a_6_meses">Entre 3 e 6 meses</option>
+            <option value="ainda_nao_sei">Ainda não sei</option>
+          </select>
+        </div>
+      )}
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700">O que você busca com o curso? (opcional)</label>
+        <textarea className="mt-1 block w-full rounded border-gray-300 p-2" rows={2} value={form.objetivo} onChange={e=>handleChange('objetivo', e.target.value)} />
       </div>
 
       {tipo === 'b2b' && (
