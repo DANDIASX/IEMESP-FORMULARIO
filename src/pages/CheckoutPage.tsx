@@ -132,9 +132,11 @@ export default function CheckoutPage(){
           ) : (
             <>
               <div className="mb-6 text-center">
-                <div className="inline-flex items-center rounded-full bg-iemesp-900/10 px-4 py-2 text-sm font-semibold text-iemesp-900">
-                  IEMESP • Checkout
-                </div>
+                <img
+                  src="/logo-iemesp.png"
+                  alt="IEMESP — Emergência para Emergencistas"
+                  className="mx-auto w-full max-w-xs rounded-2xl sm:max-w-sm"
+                />
                 <h1 className="mt-6 text-3xl font-poppins font-bold text-iemesp-900">{curso.titulo}</h1>
               </div>
 

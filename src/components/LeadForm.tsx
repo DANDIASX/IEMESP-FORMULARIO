@@ -17,7 +17,7 @@ export default function LeadForm(){
   })
   const [form, setForm] = useState<any>({
     nome: '', email: '', telefone: '', crm: '', formacao: '', especializacao: '', trabalho: '', residencia: '', instituicao: '', cargo: '' , consentimento_lgpd: false,
-    como_conheceu: '', disponibilidade: '', objetivo: ''
+    como_conheceu: '', disponibilidade: '', objetivo: '', instagram: '', tiktok: ''
   })
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
@@ -29,6 +29,11 @@ export default function LeadForm(){
   }, [])
 
   const handleChange = (k: string, v: any) => setForm((s:any)=>({ ...s, [k]: v }))
+
+  const normalizeHandle = (v: string) => {
+    const semArroba = v.trim().replace(/^@+/, '')
+    return semArroba ? `@${semArroba}` : null
+  }
 
   const validate = () => {
     if(!form.nome || form.nome.trim().length === 0) { setError('Por favor, informe seu nome.'); return false }
@@ -54,6 +59,8 @@ export default function LeadForm(){
       especializacao: form.especializacao || null,
       trabalho: form.trabalho || null,
       residencia: form.residencia || null,
+      instagram: normalizeHandle(form.instagram || ''),
+      tiktok: normalizeHandle(form.tiktok || ''),
       produto_interesse: produtoInteresse,
       instituicao: tipo === 'b2b' ? (form.instituicao || null) : null,
       cargo: tipo === 'b2b' ? (form.cargo || null) : null,
@@ -163,6 +170,17 @@ export default function LeadForm(){
       <div>
         <label className="block text-sm font-medium text-gray-700">Residência (cidade/UF)</label>
         <input className="mt-1 block w-full rounded border-gray-300 p-2" value={form.residencia} onChange={e=>handleChange('residencia', e.target.value)} />
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-sm font-medium text-gray-700">Instagram (opcional)</label>
+          <input className="mt-1 block w-full rounded border-gray-300 p-2" placeholder="@seuusuario" value={form.instagram} onChange={e=>handleChange('instagram', e.target.value)} />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700">TikTok (opcional)</label>
+          <input className="mt-1 block w-full rounded border-gray-300 p-2" placeholder="@seuusuario" value={form.tiktok} onChange={e=>handleChange('tiktok', e.target.value)} />
+        </div>
       </div>
 
       <div>
