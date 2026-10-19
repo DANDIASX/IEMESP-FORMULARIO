@@ -10,15 +10,15 @@ type Props = {
   produto: ProdutoInteresse
 }
 
+const WHATSAPP_NUMERO = '5511998541993'
+
 // Único produto migrado pro checkout novo (turmas reais, preço vindo do banco).
-// plataforma/ambos ainda usam o fluxo antigo (/api/create-payment).
+// plataforma/ambos ainda não têm curso cadastrado — direcionam pro WhatsApp.
 const SLUG_CHECKOUT: Partial<Record<ProdutoInteresse, string>> = {
   curso_pratico: 'procedimentos-emergencia',
 }
 
 export default function PaymentCTA({ leadId, produto }: Props) {
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const product = PRODUCTS[produto]
   const slugCheckout = SLUG_CHECKOUT[produto]
 
@@ -40,29 +40,31 @@ export default function PaymentCTA({ leadId, produto }: Props) {
     })
   }, [slugCheckout])
 
-  const handlePay = async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const res = await fetch('/api/create-payment', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ leadId, produto }),
-      })
-      const data = await res.json()
-      if (!res.ok || !data.init_point) throw new Error(data.error || 'Falha ao iniciar pagamento')
-      window.location.href = data.init_point
-    } catch {
-      setError('Não foi possível iniciar o pagamento agora. Tente novamente em instantes.')
-      setLoading(false)
-    }
+  if (!slugCheckout) {
+    const mensagem = `Olá! Tenho interesse n${produto === 'plataforma' ? 'a' : 'o'} ${product.label} da IEMESP. Pode me passar mais informações?`
+    return (
+      <div className="mt-6 rounded-xl border border-iemesp-900/10 bg-iemesp-cream/60 p-5 text-left">
+        <p className="font-poppins font-semibold text-iemesp-900">Quer saber mais?</p>
+        <p className="mt-1 text-sm text-slate-600">
+          {product.label} ainda está em preparação. Fale com a gente no WhatsApp pra saber data de lançamento e condições.
+        </p>
+        <a
+          href={`https://wa.me/${WHATSAPP_NUMERO}?text=${encodeURIComponent(mensagem)}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-3 inline-block rounded bg-iemesp-700 px-4 py-2 text-sm font-semibold text-white"
+        >
+          Falar no WhatsApp
+        </a>
+      </div>
+    )
   }
 
   return (
     <div className="mt-6 rounded-xl border border-iemesp-900/10 bg-iemesp-cream/60 p-5 text-left">
       <p className="font-poppins font-semibold text-iemesp-900">Quer garantir sua vaga agora?</p>
       <p className="mt-1 text-sm text-slate-600">
-        {slugCheckout && precoPix !== null && precoCartao !== null
+        {precoPix !== null && precoCartao !== null
           ? <>{product.label} — {centavosToBRL(precoPix)} no Pix ou {centavosToBRL(precoCartao)} no cartão. Pagamento seguro via Mercado Pago.</>
           : <>{product.label} — {currency(product.price)}. Pagamento via Pix ou cartão em até 12x, seguro via Mercado Pago.</>
         }
@@ -72,25 +74,12 @@ export default function PaymentCTA({ leadId, produto }: Props) {
           Turmas disponíveis: {datasTurmas.join(' ou ')}
         </p>
       )}
-
-      {slugCheckout ? (
-        <a
-          href={`/checkout/${slugCheckout}?lead=${leadId}`}
-          className="mt-3 inline-block rounded bg-iemesp-700 px-4 py-2 text-sm font-semibold text-white"
-        >
-          Quero garantir minha vaga agora
-        </a>
-      ) : (
-        <button
-          type="button"
-          onClick={handlePay}
-          disabled={loading}
-          className="mt-3 rounded bg-iemesp-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
-        >
-          {loading ? 'Preparando pagamento...' : 'Quero garantir minha vaga agora'}
-        </button>
-      )}
-      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+      <a
+        href={`/checkout/${slugCheckout}?lead=${leadId}`}
+        className="mt-3 inline-block rounded bg-iemesp-700 px-4 py-2 text-sm font-semibold text-white"
+      >
+        Quero garantir minha vaga agora
+      </a>
     </div>
   )
 }
