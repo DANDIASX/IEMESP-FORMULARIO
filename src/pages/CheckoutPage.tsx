@@ -54,6 +54,7 @@ export default function CheckoutPage(){
   const [telefone, setTelefone] = useState('')
   const [leadId, setLeadId] = useState<string | null>(searchParams.get('lead'))
   const [registrandoInteresse, setRegistrandoInteresse] = useState(false)
+  const [dadosPreenchidos, setDadosPreenchidos] = useState(false)
 
   const [perfil, setPerfil] = useState<Perfil | ''>('')
   const [crmNumero, setCrmNumero] = useState('')
@@ -116,6 +117,19 @@ export default function CheckoutPage(){
     Promise.all([aplicarCupom(codigo), carregarTurmas()]).finally(() => setLoadingCurso(false))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug])
+
+  useEffect(() => {
+    if (!leadId) return
+    supabase.functions.invoke('buscar-lead-checkout', { body: { lead_id: leadId } }).then(({ data }) => {
+      if (data?.nome) {
+        setNome(data.nome)
+        setEmail(data.email ?? '')
+        setTelefone(data.telefone ?? '')
+        setDadosPreenchidos(true)
+      }
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const onConfirmarDados = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -276,6 +290,11 @@ export default function CheckoutPage(){
               {etapa === 'dados' && (
                 <form onSubmit={onConfirmarDados} className="space-y-4">
                   <h2 className="text-lg font-bold text-iemesp-900">Seus dados</h2>
+                  {dadosPreenchidos && (
+                    <p className="text-sm text-slate-500">
+                      Já recebemos seus dados — confira e corrija se precisar antes de continuar.
+                    </p>
+                  )}
                   <div>
                     <label className="block text-sm font-medium text-gray-700">Nome *</label>
                     <input className="mt-1 block w-full rounded border-gray-300 p-2" value={nome} onChange={e => setNome(e.target.value)} />

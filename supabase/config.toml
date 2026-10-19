@@ -21,3 +21,6 @@ verify_jwt = true
 
 [functions.registrar-interesse-checkout]
 verify_jwt = true
+
+[functions.buscar-lead-checkout]
+verify_jwt = true
