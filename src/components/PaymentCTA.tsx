@@ -3,6 +3,7 @@ import { PRODUCTS, type ProdutoInteresse } from '../config/pricing'
 import { formatBRL as currency } from '../lib/currency'
 import { centavosToBRL } from '../lib/currency'
 import { supabase } from '../lib/supabase'
+import { formatarDataBR } from '../lib/date'
 
 type Props = {
   leadId: string
@@ -23,6 +24,7 @@ export default function PaymentCTA({ leadId, produto }: Props) {
 
   const [precoCartao, setPrecoCartao] = useState<number | null>(null)
   const [precoPix, setPrecoPix] = useState<number | null>(null)
+  const [datasTurmas, setDatasTurmas] = useState<string[]>([])
 
   useEffect(() => {
     if (!slugCheckout) return
@@ -31,6 +33,10 @@ export default function PaymentCTA({ leadId, produto }: Props) {
         setPrecoCartao(data.curso.preco_original_centavos)
         setPrecoPix(data.curso.preco_pix_original_centavos)
       }
+    })
+    supabase.functions.invoke('listar-turmas', { body: { curso_slug: slugCheckout } }).then(({ data }) => {
+      const turmas = (data?.turmas as { data_turma: string; status: string }[] | undefined) ?? []
+      setDatasTurmas(turmas.filter(t => t.status !== 'esgotada').map(t => formatarDataBR(t.data_turma)))
     })
   }, [slugCheckout])
 
@@ -61,6 +67,11 @@ export default function PaymentCTA({ leadId, produto }: Props) {
           : <>{product.label} — {currency(product.price)}. Pagamento via Pix ou cartão em até 12x, seguro via Mercado Pago.</>
         }
       </p>
+      {datasTurmas.length > 0 && (
+        <p className="mt-1 text-sm font-semibold text-iemesp-900">
+          Turmas disponíveis: {datasTurmas.join(' ou ')}
+        </p>
+      )}
 
       {slugCheckout ? (
         <a

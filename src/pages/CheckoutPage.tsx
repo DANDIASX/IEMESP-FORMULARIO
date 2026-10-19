@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { getAttribution } from '../lib/attribution'
 import { formatPhone } from '../lib/phone'
 import { centavosToBRL } from '../lib/currency'
+import { formatarDataBR } from '../lib/date'
 
 type CursoInfo = {
   titulo: string
@@ -27,11 +28,6 @@ type Etapa = 'dados' | 'turma' | 'perfil' | 'metodo'
 type Perfil = 'medico' | 'interno' | 'estudante'
 
 const PRECO_ZERADO: PrecoCalculado = { desconto_centavos: 0, preco_final_centavos: 0 }
-
-const formatarData = (iso: string) => {
-  const [ano, mes, dia] = iso.split('-')
-  return `${dia}/${mes}/${ano}`
-}
 
 export default function CheckoutPage(){
   const { slug } = useParams<{ slug: string }>()
@@ -232,13 +228,21 @@ export default function CheckoutPage(){
 
               {/* Resumo fixo */}
               <div className="mb-6 rounded-xl border border-iemesp-900/10 bg-iemesp-cream/60 p-4 text-sm space-y-2">
-                {turmaSelecionada && (
+                {turmaSelecionada ? (
                   <div className="border-b pb-2">
                     <p className="font-semibold text-iemesp-900">{turmaSelecionada.nome}</p>
                     {turmaSelecionada.local && <p className="text-slate-600">{turmaSelecionada.local}</p>}
                     {turmaSelecionada.horario && <p className="text-slate-600">{turmaSelecionada.horario}</p>}
                   </div>
-                )}
+                ) : turmas.length > 0 ? (
+                  <div className="border-b pb-2">
+                    <p className="font-semibold text-iemesp-900">Datas disponíveis</p>
+                    <p className="text-slate-600">
+                      {turmas.map(t => formatarDataBR(t.data_turma)).join(' ou ')}
+                      {turmas[0]?.local ? ` · ${turmas[0].local}` : ''}
+                    </p>
+                  </div>
+                ) : null}
                 <div>
                   <div className="flex justify-between">
                     <span>Pix</span>
@@ -318,7 +322,7 @@ export default function CheckoutPage(){
                       className="w-full rounded-xl border border-iemesp-900/10 bg-iemesp-cream/60 p-4 text-left transition hover:bg-iemesp-cream disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <div className="flex items-center justify-between">
-                        <span className="font-semibold text-iemesp-900">{formatarData(t.data_turma)}</span>
+                        <span className="font-semibold text-iemesp-900">{formatarDataBR(t.data_turma)}</span>
                         <span className={`text-xs font-semibold ${t.vagas_restantes === 0 ? 'text-red-600' : t.vagas_restantes <= 4 ? 'text-orange-600' : 'text-emerald-700'}`}>
                           {t.vagas_restantes === 0 ? 'Esgotada' : `${t.vagas_restantes} vaga${t.vagas_restantes === 1 ? '' : 's'} restante${t.vagas_restantes === 1 ? '' : 's'}`}
                         </span>

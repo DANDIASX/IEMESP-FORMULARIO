@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { baixarIcs } from '../lib/ics'
+import { formatarDataBR } from '../lib/date'
 
 // TODO: substituir pelo link real do grupo de WhatsApp da turma quando você definir.
 const LINK_GRUPO_WHATSAPP = ''
@@ -14,11 +15,6 @@ type TurmaResumo = {
   horario: string | null
   local: string | null
   curso_titulo: string | null
-}
-
-const formatarData = (iso: string) => {
-  const [ano, mes, dia] = iso.split('-')
-  return `${dia}/${mes}/${ano}`
 }
 
 const STATUS_MESSAGE: Record<PedidoStatus, { titulo: string; texto: string }> = {
@@ -93,7 +89,7 @@ export default function PaymentStatusPage(){
             <div className="mt-6 space-y-4 text-left">
               <div className="rounded-xl bg-iemesp-cream/60 p-4 text-sm">
                 <p className="font-semibold text-iemesp-900">{turma.curso_titulo} — {turma.nome}</p>
-                <p className="text-slate-600">{formatarData(turma.data_turma)}{turma.horario ? ` · ${turma.horario}` : ''}</p>
+                <p className="text-slate-600">{formatarDataBR(turma.data_turma)}{turma.horario ? ` · ${turma.horario}` : ''}</p>
                 {turma.local && <p className="text-slate-600">{turma.local}</p>}
               </div>
 
