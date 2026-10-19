@@ -17,7 +17,7 @@ export default function LeadForm(){
   })
   const [form, setForm] = useState<any>({
     nome: '', email: '', telefone: '', crm: '', formacao: '', especializacao: '', trabalho: '', residencia: '', instituicao: '', cargo: '' , consentimento_lgpd: false,
-    como_conheceu: '', disponibilidade: '', objetivo: '', instagram: '', tiktok: ''
+    como_conheceu: '', objetivo: '', instagram: '', tiktok: ''
   })
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
@@ -65,7 +65,6 @@ export default function LeadForm(){
       instituicao: tipo === 'b2b' ? (form.instituicao || null) : null,
       cargo: tipo === 'b2b' ? (form.cargo || null) : null,
       como_conheceu: form.como_conheceu || null,
-      disponibilidade: produtoInteresse !== 'plataforma' ? (form.disponibilidade || null) : null,
       objetivo: form.objetivo || null,
       origem: 'formulario',
       consentimento_lgpd: form.consentimento_lgpd,
@@ -212,19 +211,6 @@ export default function LeadForm(){
           </label>
         </div>
       </div>
-
-      {produtoInteresse !== 'plataforma' && (
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Disponibilidade para o curso presencial</label>
-          <select className="mt-1 block w-full rounded border-gray-300 p-2" value={form.disponibilidade} onChange={e=>handleChange('disponibilidade', e.target.value)}>
-            <option value="">Selecione</option>
-            <option value="proximos_30_dias">Próximos 30 dias</option>
-            <option value="1_a_3_meses">Entre 1 e 3 meses</option>
-            <option value="3_a_6_meses">Entre 3 e 6 meses</option>
-            <option value="ainda_nao_sei">Ainda não sei</option>
-          </select>
-        </div>
-      )}
 
       <div>
         <label className="block text-sm font-medium text-gray-700">O que você busca com o curso? (opcional)</label>
