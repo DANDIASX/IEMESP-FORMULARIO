@@ -203,11 +203,11 @@ export default function LeadForm(){
           </label>
           <label className="flex items-start gap-2">
             <input type="radio" name="produto_interesse" className="mt-1" checked={produtoInteresse==='plataforma'} onChange={()=>setProdutoInteresse('plataforma')} />
-            <span>Plataforma de Educação Permanente (online)</span>
+            <span>Plataforma de Educação Permanente (online) <span className="text-xs text-slate-400">(em construção)</span></span>
           </label>
           <label className="flex items-start gap-2">
             <input type="radio" name="produto_interesse" className="mt-1" checked={produtoInteresse==='ambos'} onChange={()=>setProdutoInteresse('ambos')} />
-            <span>Os dois</span>
+            <span>Os dois <span className="text-xs text-slate-400">(plataforma em construção)</span></span>
           </label>
         </div>
       </div>
