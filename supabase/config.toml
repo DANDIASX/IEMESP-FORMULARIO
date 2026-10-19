@@ -15,3 +15,9 @@ verify_jwt = true
 
 [functions.status-pedido]
 verify_jwt = true
+
+[functions.listar-turmas]
+verify_jwt = true
+
+[functions.registrar-interesse-checkout]
+verify_jwt = true

@@ -65,21 +65,24 @@ Deno.serve(async (req: Request) => {
     if (!pedidoId) return jsonOk()
 
     if (payment.status === 'approved') {
-      // Atômico e idempotente: só avança quem ainda não estava 'aprovado'.
-      // Se não retornar linha, é notificação duplicada — não repete o incremento do cupom.
-      const { data: pedido, error: updateError } = await supabaseAdmin
-        .from('pedidos')
-        .update({
-          status: 'aprovado',
-          mp_payment_id: String(dataId),
-          pago_em: payment.date_approved ?? new Date().toISOString(),
+      // Atômico, idempotente e turma-aware: se o pedido tem turma, só aprova
+      // se ainda houver vaga aprovada disponível (senão marca 'excedente' pra
+      // conferência manual). Chamar de novo pra um pedido já aprovado não
+      // repete nada — transicao_nova só vem true na primeira vez.
+      const { data: resultado, error: updateError } = await supabaseAdmin
+        .rpc('confirmar_pagamento_pedido', {
+          p_pedido_id: pedidoId,
+          p_mp_payment_id: String(dataId),
+          p_pago_em: payment.date_approved ?? new Date().toISOString(),
         })
-        .eq('id', pedidoId)
-        .neq('status', 'aprovado')
-        .select('*')
-        .maybeSingle()
+        .single()
 
-      if (updateError) console.error('Erro ao atualizar pedido:', updateError)
+      if (updateError) console.error('Erro ao confirmar pedido:', updateError)
+
+      const pedido = resultado && resultado.transicao_nova ? resultado : null
+      if (resultado?.status === 'excedente') {
+        console.error('[ALERTA] Pedido excedente — turma lotou entre a criação e a confirmação do pagamento:', pedidoId)
+      }
 
       if (pedido) {
         if (pedido.cupom_id) {

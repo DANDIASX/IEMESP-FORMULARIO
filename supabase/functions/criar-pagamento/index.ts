@@ -1,11 +1,15 @@
 import { handleOptions, jsonResponse } from '../_shared/cors.ts'
-import { escapeLike, resolvePrice } from '../_shared/pricing.ts'
+import { resolvePrice } from '../_shared/pricing.ts'
 import { supabaseAdmin } from '../_shared/supabaseAdmin.ts'
+import { encontrarOuCriarLead } from '../_shared/leads.ts'
 
 const SITE_URL = 'https://formulario.iemesp.com.br'
 
+type Perfil = 'medico' | 'interno' | 'estudante'
+
 type CriarPagamentoBody = {
   curso_slug?: string
+  turma_slug?: string
   codigo?: string
   nome?: string
   email?: string
@@ -13,6 +17,12 @@ type CriarPagamentoBody = {
   consentimento_lgpd?: boolean
   utms?: Record<string, unknown>
   metodo?: 'cartao' | 'pix'
+  perfil?: Perfil
+  crm_numero?: string
+  crm_uf?: string
+  faculdade?: string
+  ano_curso?: string
+  lead_id_hint?: string
 }
 
 Deno.serve(async (req: Request) => {
@@ -31,17 +41,24 @@ Deno.serve(async (req: Request) => {
   }
 
   const cursoSlug = body.curso_slug?.trim()
+  const turmaSlug = body.turma_slug?.trim()
   const nome = body.nome?.trim()
   const email = body.email?.trim()
   const telefone = body.telefone?.trim()
-
   const metodo = body.metodo === 'pix' ? 'pix' : body.metodo === 'cartao' ? 'cartao' : null
+  const perfil: Perfil | null = body.perfil === 'medico' || body.perfil === 'interno' || body.perfil === 'estudante' ? body.perfil : null
 
-  if (!cursoSlug || !nome || !email || !telefone || !metodo) {
-    return jsonResponse(req, { error: 'Preencha nome, e-mail, telefone e escolha a forma de pagamento.' }, 400)
+  if (!cursoSlug || !turmaSlug || !nome || !email || !telefone || !metodo || !perfil) {
+    return jsonResponse(req, { error: 'Preencha todos os dados e escolha turma, perfil e forma de pagamento.' }, 400)
   }
   if (body.consentimento_lgpd !== true) {
     return jsonResponse(req, { error: 'É necessário aceitar o consentimento LGPD.' }, 400)
+  }
+  if (perfil === 'medico' && (!body.crm_numero?.trim() || !body.crm_uf?.trim())) {
+    return jsonResponse(req, { error: 'Informe seu CRM e a UF.' }, 400)
+  }
+  if ((perfil === 'interno' || perfil === 'estudante') && !body.faculdade?.trim()) {
+    return jsonResponse(req, { error: 'Informe sua faculdade.' }, 400)
   }
 
   // Recalcula o preço no servidor — nunca confia em valor vindo do navegador.
@@ -54,65 +71,73 @@ Deno.serve(async (req: Request) => {
   const precoOriginalEscolhido = metodo === 'pix' ? (curso.preco_pix_centavos ?? curso.preco_centavos) : curso.preco_centavos
   const { desconto_centavos, preco_final_centavos } = precoEscolhido
 
-  // Vincula a um lead já existente pelo e-mail, ou cria um novo.
-  const { data: leadExistente } = await supabaseAdmin
-    .from('leads')
-    .select('id')
-    .ilike('email', escapeLike(email))
+  // Turma precisa existir, pertencer a esse curso e estar aberta.
+  const { data: turma } = await supabaseAdmin
+    .from('turmas')
+    .select('id, nome, status, curso_id')
+    .eq('slug', turmaSlug)
     .maybeSingle()
 
-  let leadId = leadExistente?.id as string | undefined
-  if (!leadId) {
-    const { data: novoLead, error: leadError } = await supabaseAdmin
-      .from('leads')
-      .insert([{
-        tipo: 'b2c',
-        nome,
-        email,
-        telefone,
-        origem: 'checkout',
-        consentimento_lgpd: true,
-        utm_source: body.utms?.utm_source ?? null,
-        utm_medium: body.utms?.utm_medium ?? null,
-        utm_campaign: body.utms?.utm_campaign ?? null,
-        utm_content: body.utms?.utm_content ?? null,
-        utm_term: body.utms?.utm_term ?? null,
-        gclid: body.utms?.gclid ?? null,
-        fbclid: body.utms?.fbclid ?? null,
-        first_landing_page: body.utms?.first_landing_page ?? null,
-        referrer: body.utms?.referrer ?? null,
-      }])
-      .select('id')
-      .single()
-
-    if (leadError || !novoLead) {
-      console.error('Erro ao criar lead no checkout:', leadError)
-      return jsonResponse(req, { error: 'Não foi possível processar seu pedido. Tente novamente.' }, 500)
-    }
-    leadId = novoLead.id
+  if (!turma || turma.curso_id !== curso.id) {
+    return jsonResponse(req, { error: 'Turma não encontrada.' }, 404)
+  }
+  if (turma.status !== 'aberta') {
+    return jsonResponse(req, { error: 'Essa turma não está com inscrições abertas no momento.' }, 409)
   }
 
-  const { data: pedido, error: pedidoError } = await supabaseAdmin
-    .from('pedidos')
-    .insert([{
-      curso_id: curso.id,
-      cupom_id: cupom?.id ?? null,
-      lead_id: leadId,
-      nome,
-      email,
-      telefone,
-      preco_original_centavos: precoOriginalEscolhido,
-      desconto_centavos,
-      valor_final_centavos: preco_final_centavos,
-      status: 'pendente',
-      utms: body.utms ?? null,
-      consentimento_lgpd: true,
-      metodo_pagamento: metodo,
-    }])
-    .select('id')
-    .single()
+  // Se veio de um link gerado pelo CRM (?lead=), usa esse lead direto —
+  // evita risco de casar com o lead errado por e-mail duplicado.
+  let leadId: string | undefined
+  if (body.lead_id_hint) {
+    const { data: leadPorId } = await supabaseAdmin
+      .from('leads')
+      .select('id')
+      .eq('id', body.lead_id_hint)
+      .maybeSingle()
+    leadId = leadPorId?.id
+  }
+
+  // Senão, vincula a um lead já existente pelo e-mail, ou cria um novo.
+  if (!leadId) {
+    leadId = (await encontrarOuCriarLead({ nome, email, telefone, origem: 'checkout', utms: body.utms })) ?? undefined
+  }
+  if (!leadId) {
+    return jsonResponse(req, { error: 'Não foi possível processar seu pedido. Tente novamente.' }, 500)
+  }
+
+  // Reserva a vaga e cria o pedido numa única transação atômica — nunca
+  // vende mais vagas do que existem, mesmo com gente pagando ao mesmo tempo.
+  const { data: pedido, error: pedidoError } = await supabaseAdmin.rpc('criar_pedido_com_vaga', {
+    p_turma_id: turma.id,
+    p_curso_id: curso.id,
+    p_cupom_id: cupom?.id ?? null,
+    p_lead_id: leadId,
+    p_nome: nome,
+    p_email: email,
+    p_telefone: telefone,
+    p_preco_original_centavos: precoOriginalEscolhido,
+    p_desconto_centavos: desconto_centavos,
+    p_valor_final_centavos: preco_final_centavos,
+    p_utms: body.utms ?? {},
+    p_consentimento_lgpd: true,
+    p_metodo_pagamento: metodo,
+    p_perfil: perfil,
+    p_crm_numero: body.crm_numero?.trim() ?? null,
+    p_crm_uf: body.crm_uf?.trim() ?? null,
+    p_faculdade: body.faculdade?.trim() ?? null,
+    p_ano_curso: body.ano_curso?.trim() ?? null,
+    p_parcelas: metodo === 'cartao' ? curso.max_parcelas : 1,
+  }).single()
 
   if (pedidoError || !pedido) {
+    if (pedidoError?.message?.includes('sem_vagas')) {
+      // Guarda o interesse no lead pra você conseguir contatar pela lista de espera.
+      await supabaseAdmin.from('leads').update({ turma_interesse: `lista_espera:${turmaSlug}` }).eq('id', leadId)
+      return jsonResponse(req, {
+        error: 'Essa turma está com todas as vagas preenchidas.',
+        sem_vagas: true,
+      }, 409)
+    }
     console.error('Erro ao criar pedido:', pedidoError)
     return jsonResponse(req, { error: 'Não foi possível processar seu pedido. Tente novamente.' }, 500)
   }
@@ -134,7 +159,7 @@ Deno.serve(async (req: Request) => {
       body: JSON.stringify({
         items: [{
           id: curso.slug,
-          title: curso.titulo,
+          title: `${curso.titulo} — ${turma.nome}`,
           quantity: 1,
           unit_price: preco_final_centavos / 100,
           currency_id: 'BRL',
