@@ -1,6 +1,7 @@
 import React from 'react'
 import { Routes, Route } from 'react-router-dom'
 import PublicForm from './pages/PublicForm'
+import FalciformePage from './pages/FalciformePage'
 import AdminLogin from './pages/AdminLogin'
 import AdminDashboard from './pages/AdminDashboard'
 import CheckoutPage from './pages/CheckoutPage'
@@ -11,6 +12,7 @@ export default function App(){
   return (
     <Routes>
       <Route path="/" element={<PublicForm />} />
+      <Route path="/falciforme" element={<FalciformePage />} />
       <Route path="/checkout/:slug" element={<CheckoutPage />} />
       <Route path="/pagamento/sucesso" element={<PaymentStatusPage />} />
       <Route path="/pagamento/pendente" element={<PaymentStatusPage />} />
