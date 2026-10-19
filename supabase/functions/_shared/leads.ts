@@ -1,5 +1,6 @@
 import { supabaseAdmin } from './supabaseAdmin.ts'
 import { escapeLike } from './pricing.ts'
+import { enviarNotificacaoTelegram } from './notify.ts'
 
 type DadosLead = {
   nome: string
@@ -45,5 +46,14 @@ export async function encontrarOuCriarLead(dados: DadosLead): Promise<string | n
     console.error('Erro ao criar lead:', error)
     return null
   }
+
+  await enviarNotificacaoTelegram({
+    nome: dados.nome,
+    telefone: dados.telefone,
+    email: dados.email,
+    origem: dados.origem,
+    utm_source: dados.utms?.utm_source as string | undefined,
+  })
+
   return novoLead.id
 }

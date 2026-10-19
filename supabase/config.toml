@@ -24,3 +24,6 @@ verify_jwt = true
 
 [functions.buscar-lead-checkout]
 verify_jwt = true
+
+[functions.notificar-novo-lead]
+verify_jwt = true

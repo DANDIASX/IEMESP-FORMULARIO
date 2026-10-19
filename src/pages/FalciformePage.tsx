@@ -95,6 +95,7 @@ export default function FalciformePage(){
       if (supError) throw supError
       setSubmitted(true)
       if (ehQualificado) trackLead()
+      supabase.functions.invoke('notificar-novo-lead', { body: { lead_id: payload.id } }).catch(() => {})
     } catch (err: any) {
       setError(err?.message || 'Ocorreu um erro ao enviar. Tente novamente em instantes.')
     } finally {
