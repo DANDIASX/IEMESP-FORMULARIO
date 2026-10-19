@@ -1,4 +1,11 @@
 {
+  "redirects": [
+    {
+      "source": "/falciforme",
+      "destination": "/?utm_source=liga-lahtc-limieu&utm_medium=qrcode&utm_campaign=aula_falciforme_out26",
+      "permanent": false
+    }
+  ],
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ]
