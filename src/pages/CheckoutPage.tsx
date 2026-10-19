@@ -293,6 +293,27 @@ export default function CheckoutPage(){
                       inputMode="tel"
                     />
                   </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Cupom de desconto</label>
+                    <div className="mt-1 flex gap-2">
+                      <input
+                        className="block w-full rounded border-gray-300 p-2"
+                        value={codigo}
+                        onChange={e => setCodigo(e.target.value)}
+                        placeholder="Opcional"
+                      />
+                      <button
+                        type="button"
+                        disabled={aplicandoCupom}
+                        onClick={() => aplicarCupom(codigo)}
+                        className="shrink-0 rounded bg-iemesp-900 px-4 py-2 text-sm text-white disabled:opacity-60"
+                      >
+                        {aplicandoCupom ? 'Aplicando...' : 'Aplicar'}
+                      </button>
+                    </div>
+                    {cupomAplicado && <p className="mt-1 text-sm text-emerald-700">Cupom {cupomAplicado} aplicado.</p>}
+                    {cupomError && <p className="mt-1 text-sm text-red-600">{cupomError}</p>}
+                  </div>
                   {submitError && <div className="text-red-600 text-sm">{submitError}</div>}
                   <button
                     type="submit"
@@ -386,27 +407,6 @@ export default function CheckoutPage(){
                       </label>
                     </>
                   )}
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Cupom de desconto</label>
-                    <div className="mt-1 flex gap-2">
-                      <input
-                        className="block w-full rounded border-gray-300 p-2"
-                        value={codigo}
-                        onChange={e => setCodigo(e.target.value)}
-                        placeholder="Opcional"
-                      />
-                      <button
-                        type="button"
-                        disabled={aplicandoCupom}
-                        onClick={() => aplicarCupom(codigo)}
-                        className="shrink-0 rounded bg-iemesp-900 px-4 py-2 text-sm text-white disabled:opacity-60"
-                      >
-                        {aplicandoCupom ? 'Aplicando...' : 'Aplicar'}
-                      </button>
-                    </div>
-                    {cupomError && <p className="mt-1 text-sm text-red-600">{cupomError}</p>}
-                  </div>
 
                   <label className="flex items-start gap-2 text-sm">
                     <input type="checkbox" className="mt-1" checked={consentimento} onChange={e => setConsentimento(e.target.checked)} />
