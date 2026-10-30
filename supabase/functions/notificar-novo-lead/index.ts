@@ -1,6 +1,7 @@
 import { handleOptions, jsonResponse } from '../_shared/cors.ts'
 import { supabaseAdmin } from '../_shared/supabaseAdmin.ts'
 import { enviarNotificacaoTelegram } from '../_shared/notify.ts'
+import { enviarEventoMetaCapi } from '../_shared/metaCapi.ts'
 
 // Chamada pelo navegador depois de um cadastro direto na tabela leads
 // (formulário público), já que o front não pode chamar o Telegram direto
@@ -14,7 +15,7 @@ Deno.serve(async (req: Request) => {
     return jsonResponse(req, { error: 'Método não permitido' }, 405)
   }
 
-  let body: { lead_id?: string }
+  let body: { lead_id?: string; qualificado?: boolean }
   try {
     body = await req.json()
   } catch {
@@ -34,6 +35,18 @@ Deno.serve(async (req: Request) => {
 
   if (lead) {
     await enviarNotificacaoTelegram(lead)
+    // Mesmo event_id (leadId) usado no fbq('track','Lead') do navegador —
+    // a Meta deduplica e não conta o mesmo lead duas vezes. Respeita a mesma
+    // regra do front: perfil não qualificado (ex.: "outro" no /falciforme)
+    // não dispara o evento, pra não ensinar o algoritmo a trazer o público errado.
+    if (body.qualificado !== false) {
+      await enviarEventoMetaCapi({
+        nomeEvento: 'Lead',
+        email: lead.email,
+        telefone: lead.telefone,
+        eventId: leadId,
+      })
+    }
   }
 
   return jsonResponse(req, { ok: true })

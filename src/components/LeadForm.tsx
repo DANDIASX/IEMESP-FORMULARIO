@@ -86,7 +86,7 @@ export default function LeadForm(){
       if(supError) throw supError
       setLeadId(newLeadId)
       setSuccess(true)
-      trackLead()
+      trackLead(newLeadId)
       supabase.functions.invoke('notificar-novo-lead', { body: { lead_id: newLeadId } }).catch(() => {})
     }catch(err:any){
       console.error('Erro ao enviar lead:', err)

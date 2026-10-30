@@ -65,7 +65,7 @@ export default function PaymentStatusPage(){
 
       if (data.status === 'aprovado' && !purchaseRastreadaRef.current && typeof data.valor_final_centavos === 'number') {
         purchaseRastreadaRef.current = true
-        trackPurchase(data.valor_final_centavos / 100)
+        trackPurchase(data.valor_final_centavos / 100, 'BRL', pedidoId ?? undefined)
       }
 
       tentativaRef.current += 1

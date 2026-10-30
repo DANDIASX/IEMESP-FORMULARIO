@@ -1,6 +1,7 @@
 import { supabaseAdmin } from './supabaseAdmin.ts'
 import { escapeLike } from './pricing.ts'
 import { enviarNotificacaoTelegram } from './notify.ts'
+import { enviarEventoMetaCapi } from './metaCapi.ts'
 
 type DadosLead = {
   nome: string
@@ -53,6 +54,13 @@ export async function encontrarOuCriarLead(dados: DadosLead): Promise<string | n
     email: dados.email,
     origem: dados.origem,
     utm_source: dados.utms?.utm_source as string | undefined,
+  })
+
+  await enviarEventoMetaCapi({
+    nomeEvento: 'Lead',
+    email: dados.email,
+    telefone: dados.telefone,
+    eventId: novoLead.id,
   })
 
   return novoLead.id

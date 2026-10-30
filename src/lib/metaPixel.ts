@@ -29,10 +29,12 @@ export function initMetaPixel() {
   callFbq('track', 'PageView')
 }
 
-export function trackLead() {
-  callFbq('track', 'Lead')
+// eventId: mesmo ID usado no envio do servidor (API de Conversões) — permite
+// a Meta deduplicar e não contar o mesmo lead/compra duas vezes.
+export function trackLead(eventId?: string) {
+  callFbq('track', 'Lead', {}, eventId ? { eventID: eventId } : undefined)
 }
 
-export function trackPurchase(value: number, currency = 'BRL') {
-  callFbq('track', 'Purchase', { value, currency })
+export function trackPurchase(value: number, currency = 'BRL', eventId?: string) {
+  callFbq('track', 'Purchase', { value, currency }, eventId ? { eventID: eventId } : undefined)
 }

@@ -94,8 +94,8 @@ export default function FalciformePage(){
       const { error: supError } = await supabase.from('leads').insert([payload])
       if (supError) throw supError
       setSubmitted(true)
-      if (ehQualificado) trackLead()
-      supabase.functions.invoke('notificar-novo-lead', { body: { lead_id: payload.id } }).catch(() => {})
+      if (ehQualificado) trackLead(payload.id)
+      supabase.functions.invoke('notificar-novo-lead', { body: { lead_id: payload.id, qualificado: ehQualificado } }).catch(() => {})
     } catch (err: any) {
       setError(err?.message || 'Ocorreu um erro ao enviar. Tente novamente em instantes.')
     } finally {

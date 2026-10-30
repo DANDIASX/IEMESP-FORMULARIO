@@ -1,5 +1,6 @@
 import { InvalidWebhookSignatureError, WebhookSignatureValidator } from 'npm:mercadopago@2'
 import { supabaseAdmin } from '../_shared/supabaseAdmin.ts'
+import { enviarEventoMetaCapi } from '../_shared/metaCapi.ts'
 
 function jsonOk(body: unknown = { received: true }, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
@@ -120,6 +121,16 @@ Deno.serve(async (req: Request) => {
                 .from('students')
                 .insert([{ lead_id: lead.id, nome: lead.nome, email: lead.email, telefone: lead.telefone }])
             }
+
+            // Mesmo event_id (pedidoId) usado no fbq('track','Purchase') do
+            // navegador na tela de pagamento — a Meta deduplica.
+            await enviarEventoMetaCapi({
+              nomeEvento: 'Purchase',
+              email: lead.email,
+              telefone: lead.telefone,
+              valor: pedido.valor_final_centavos / 100,
+              eventId: pedidoId,
+            })
           }
         }
       }
