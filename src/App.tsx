@@ -7,18 +7,22 @@ import AdminDashboard from './pages/AdminDashboard'
 import CheckoutPage from './pages/CheckoutPage'
 import PaymentStatusPage from './pages/PaymentStatusPage'
 import ProtectedRoute from './components/ProtectedRoute'
+import CookieConsentBanner from './components/CookieConsentBanner'
 
 export default function App(){
   return (
-    <Routes>
-      <Route path="/" element={<PublicForm />} />
-      <Route path="/falciforme" element={<FalciformePage />} />
-      <Route path="/checkout/:slug" element={<CheckoutPage />} />
-      <Route path="/pagamento/sucesso" element={<PaymentStatusPage />} />
-      <Route path="/pagamento/pendente" element={<PaymentStatusPage />} />
-      <Route path="/pagamento/erro" element={<PaymentStatusPage />} />
-      <Route path="/admin/login" element={<AdminLogin />} />
-      <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
-    </Routes>
+    <>
+      <Routes>
+        <Route path="/" element={<PublicForm />} />
+        <Route path="/falciforme" element={<FalciformePage />} />
+        <Route path="/checkout/:slug" element={<CheckoutPage />} />
+        <Route path="/pagamento/sucesso" element={<PaymentStatusPage />} />
+        <Route path="/pagamento/pendente" element={<PaymentStatusPage />} />
+        <Route path="/pagamento/erro" element={<PaymentStatusPage />} />
+        <Route path="/admin/login" element={<AdminLogin />} />
+        <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
+      </Routes>
+      <CookieConsentBanner />
+    </>
   )
 }
