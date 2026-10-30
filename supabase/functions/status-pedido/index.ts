@@ -23,7 +23,7 @@ Deno.serve(async (req: Request) => {
 
   const { data: pedido, error } = await supabaseAdmin
     .from('pedidos')
-    .select('status, turmas(nome, data_turma, horario, local, cursos(titulo))')
+    .select('status, valor_final_centavos, turmas(nome, data_turma, horario, local, cursos(titulo))')
     .eq('id', pedidoId)
     .maybeSingle()
 
@@ -35,9 +35,11 @@ Deno.serve(async (req: Request) => {
     | { nome: string; data_turma: string; horario: string | null; local: string | null; cursos: { titulo: string } | null }
     | null
 
-  // Só o status e dados logísticos da turma — nada de e-mail, valor ou outros dados do pedido.
+  // Só o status, o valor (pra rastrear a conversão de compra) e dados logísticos
+  // da turma — nada de e-mail ou outros dados pessoais do pedido.
   return jsonResponse(req, {
     status: pedido.status,
+    valor_final_centavos: pedido.valor_final_centavos,
     turma: turma
       ? {
           nome: turma.nome,

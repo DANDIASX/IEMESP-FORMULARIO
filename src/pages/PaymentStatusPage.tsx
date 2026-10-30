@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { baixarIcs } from '../lib/ics'
 import { formatarDataBR } from '../lib/date'
+import { trackPurchase } from '../lib/metaPixel'
 
 // TODO: substituir pelo link real do grupo de WhatsApp da turma quando você definir.
 const LINK_GRUPO_WHATSAPP = ''
@@ -40,6 +41,7 @@ export default function PaymentStatusPage(){
   const [turma, setTurma] = useState<TurmaResumo | null>(null)
   const [erro, setErro] = useState<string | null>(null)
   const tentativaRef = useRef(0)
+  const purchaseRastreadaRef = useRef(false)
 
   useEffect(() => {
     if (!pedidoId) {
@@ -60,6 +62,11 @@ export default function PaymentStatusPage(){
 
       setStatus(data.status)
       setTurma(data.turma ?? null)
+
+      if (data.status === 'aprovado' && !purchaseRastreadaRef.current && typeof data.valor_final_centavos === 'number') {
+        purchaseRastreadaRef.current = true
+        trackPurchase(data.valor_final_centavos / 100)
+      }
 
       tentativaRef.current += 1
       if (data.status === 'pendente' && tentativaRef.current < TENTATIVAS) {
