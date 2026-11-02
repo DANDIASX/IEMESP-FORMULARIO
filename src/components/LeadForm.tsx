@@ -16,8 +16,8 @@ export default function LeadForm(){
     gclid: null, fbclid: null, first_landing_page: null, referrer: null
   })
   const [form, setForm] = useState<any>({
-    nome: '', email: '', telefone: '', crm: '', formacao: '', especializacao: '', trabalho: '', residencia: '', instituicao: '', cargo: '' , consentimento_lgpd: false,
-    como_conheceu: '', objetivo: '', instagram: '', tiktok: ''
+    nome: '', email: '', telefone: '', instituicao: '', cargo: '', consentimento_lgpd: false,
+    objetivo: '', instagram: '', tiktok: ''
   })
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
@@ -54,17 +54,11 @@ export default function LeadForm(){
       nome: form.nome,
       email: form.email || null,
       telefone: form.telefone,
-      crm: form.crm || null,
-      formacao: form.formacao || null,
-      especializacao: form.especializacao || null,
-      trabalho: form.trabalho || null,
-      residencia: form.residencia || null,
       instagram: normalizeHandle(form.instagram || ''),
       tiktok: normalizeHandle(form.tiktok || ''),
       produto_interesse: produtoInteresse,
       instituicao: tipo === 'b2b' ? (form.instituicao || null) : null,
       cargo: tipo === 'b2b' ? (form.cargo || null) : null,
-      como_conheceu: form.como_conheceu || null,
       objetivo: form.objetivo || null,
       origem: 'formulario',
       consentimento_lgpd: form.consentimento_lgpd,
@@ -120,7 +114,7 @@ export default function LeadForm(){
 
       <div>
         <label className="block text-sm font-medium text-gray-700">Tipo</label>
-        <div className="flex gap-4 mt-2">
+        <div className="mt-2 space-y-2">
           <label className="flex items-center gap-2">
             <input type="radio" name="tipo" checked={tipo==='b2c'} onChange={()=>setTipo('b2c')} />
             <span>Médico/Aluno</span>
@@ -147,31 +141,6 @@ export default function LeadForm(){
         <input className="mt-1 block w-full rounded border-gray-300 p-2" value={form.telefone} onChange={e=>handleChange('telefone', formatPhone(e.target.value))} inputMode="tel" />
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700">CRM</label>
-        <input className="mt-1 block w-full rounded border-gray-300 p-2" value={form.crm} onChange={e=>handleChange('crm', e.target.value)} />
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-gray-700">Formação (onde se formou/estuda)</label>
-        <input className="mt-1 block w-full rounded border-gray-300 p-2" value={form.formacao} onChange={e=>handleChange('formacao', e.target.value)} />
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-gray-700">Especialização</label>
-        <input className="mt-1 block w-full rounded border-gray-300 p-2" value={form.especializacao} onChange={e=>handleChange('especializacao', e.target.value)} />
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-gray-700">Trabalho</label>
-        <input className="mt-1 block w-full rounded border-gray-300 p-2" value={form.trabalho} onChange={e=>handleChange('trabalho', e.target.value)} />
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-gray-700">Residência (cidade/UF)</label>
-        <input className="mt-1 block w-full rounded border-gray-300 p-2" value={form.residencia} onChange={e=>handleChange('residencia', e.target.value)} />
-      </div>
-
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="block text-sm font-medium text-gray-700">Instagram (opcional)</label>
@@ -181,18 +150,6 @@ export default function LeadForm(){
           <label className="block text-sm font-medium text-gray-700">TikTok (opcional)</label>
           <input className="mt-1 block w-full rounded border-gray-300 p-2" placeholder="@seuusuario" value={form.tiktok} onChange={e=>handleChange('tiktok', e.target.value)} />
         </div>
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-gray-700">Como você conheceu a IEMESP?</label>
-        <select className="mt-1 block w-full rounded border-gray-300 p-2" value={form.como_conheceu} onChange={e=>handleChange('como_conheceu', e.target.value)}>
-          <option value="">Selecione</option>
-          <option value="instagram">Instagram</option>
-          <option value="indicacao">Indicação de colega/amigo</option>
-          <option value="google">Google</option>
-          <option value="whatsapp">WhatsApp</option>
-          <option value="outro">Outro</option>
-        </select>
       </div>
 
       <div>
