@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react'
+import React, { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { trackLead } from '../lib/metaPixel'
 import { getAttribution } from '../lib/attribution'
 import { formatPhone } from '../lib/phone'
+import { useDocumentTitle } from '../lib/useDocumentTitle'
 
 type Perfil = 'medico' | 'interno' | 'estudante' | 'outro'
 type TurmaInteresse = '23/01/2027' | '20/02/2027' | 'ainda_nao_sei'
@@ -50,11 +51,7 @@ export default function FalciformePage(){
   const [submitted, setSubmitted] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    const tituloAnterior = document.title
-    document.title = 'Mapa mental · Doença falciforme no PS | IEMESP'
-    return () => { document.title = tituloAnterior }
-  }, [])
+  useDocumentTitle('Mapa mental · Doença falciforme no PS | IEMESP')
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

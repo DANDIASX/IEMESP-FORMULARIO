@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import LeadForm from '../components/LeadForm'
 import { trackPurchase } from '../lib/metaPixel'
 import { PRODUCTS, type ProdutoInteresse } from '../config/pricing'
+import { useDocumentTitle } from '../lib/useDocumentTitle'
 
 type MpStatus = 'approved' | 'pending' | 'failure'
 
@@ -13,6 +14,7 @@ const STATUS_MESSAGE: Record<MpStatus, string> = {
 
 export default function PublicForm(){
   const [mpStatus, setMpStatus] = useState<MpStatus | null>(null)
+  useDocumentTitle('Inscreva-se — Procedimentos 2.0 | IEMESP')
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)

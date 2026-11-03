@@ -5,6 +5,7 @@ import { getAttribution } from '../lib/attribution'
 import { formatPhone } from '../lib/phone'
 import { centavosToBRL } from '../lib/currency'
 import { formatarDataBR } from '../lib/date'
+import { useDocumentTitle } from '../lib/useDocumentTitle'
 
 type CursoInfo = {
   titulo: string
@@ -36,6 +37,7 @@ export default function CheckoutPage(){
   const [loadingCurso, setLoadingCurso] = useState(true)
   const [cursoError, setCursoError] = useState<string | null>(null)
   const [curso, setCurso] = useState<CursoInfo | null>(null)
+  useDocumentTitle(curso ? `${curso.titulo} — Inscrição | IEMESP` : 'Inscrição — Procedimentos de Emergência | IEMESP')
 
   const [codigo, setCodigo] = useState(searchParams.get('cupom') ?? '')
   const [cupomAplicado, setCupomAplicado] = useState<string | null>(null)
