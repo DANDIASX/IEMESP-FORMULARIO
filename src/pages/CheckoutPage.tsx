@@ -365,8 +365,8 @@ export default function CheckoutPage(){
                     >
                       <div className="flex items-center justify-between">
                         <span className="font-semibold text-iemesp-900">{formatarDataBR(t.data_turma)}</span>
-                        <span className={`text-xs font-semibold ${t.vagas_restantes === 0 ? 'text-red-600' : t.vagas_restantes <= 4 ? 'text-orange-600' : 'text-emerald-700'}`}>
-                          {t.vagas_restantes === 0 ? 'Esgotada' : `${t.vagas_restantes} vaga${t.vagas_restantes === 1 ? '' : 's'} restante${t.vagas_restantes === 1 ? '' : 's'}`}
+                        <span className={`text-xs font-semibold ${t.vagas_restantes === 0 ? 'text-red-600' : 'text-emerald-700'}`}>
+                          {t.vagas_restantes === 0 ? 'Vagas esgotadas' : 'Vaga disponível'}
                         </span>
                       </div>
                       {t.local && <p className="text-xs text-slate-500">{t.local}{t.horario ? ` · ${t.horario}` : ''}</p>}
