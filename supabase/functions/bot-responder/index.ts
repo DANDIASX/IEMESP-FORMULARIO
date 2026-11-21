@@ -7,7 +7,7 @@ const MODELO = 'claude-sonnet-5-5'
 const MAX_MENSAGENS_HISTORICO = 30
 const ESPERA_AGRUPAMENTO_MS = 30_000
 const ESPERA_MAXIMA_MS = 120_000
-const MAX_RODADAS_FERRAMENTA = 6
+const MAX_RODADAS_FERRAMENTA = 4
 const TRINTA_MINUTOS_MS = 30 * 60 * 1000
 
 const anthropic = new Anthropic()
@@ -106,13 +106,38 @@ const TOOLS: Anthropic.Tool[] = [
   },
 ]
 
-async function vagasRestantes(slug: string): Promise<{ encontrada: boolean; vagas_restantes: number; status: string }> {
-  const { data: turma } = await supabaseAdmin
-    .from('turmas')
-    .select('id, vagas_total, status')
-    .eq('slug', slug)
-    .maybeSingle()
+type TurmaResolvida = { id: string; slug: string; vagas_total: number; status: string }
 
+// O modelo não sabe (nem precisa saber) o slug técnico da turma — ele só viu datas
+// na base de conhecimento ("23/01/2027", "20/02/2027"). Aceita slug, data completa
+// (AAAA-MM-DD) ou dia/mês (com ou sem ano) e resolve contra as turmas reais.
+async function resolverTurma(entrada: string): Promise<TurmaResolvida | null> {
+  const valor = entrada.trim()
+  const { data: turmas } = await supabaseAdmin.from('turmas').select('id, slug, data_turma, vagas_total, status')
+  if (!turmas) return null
+
+  const porSlug = turmas.find((t) => t.slug === valor)
+  if (porSlug) return porSlug
+
+  const isoMatch = valor.match(/(\d{4})-(\d{2})-(\d{2})/)
+  if (isoMatch) {
+    const porData = turmas.find((t) => t.data_turma === `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`)
+    if (porData) return porData
+  }
+
+  const diaMesMatch = valor.match(/(\d{1,2})[\/\-](\d{1,2})/)
+  if (diaMesMatch) {
+    const dia = diaMesMatch[1].padStart(2, '0')
+    const mes = diaMesMatch[2].padStart(2, '0')
+    const porDiaMes = turmas.find((t) => t.data_turma.slice(5, 10) === `${mes}-${dia}`)
+    if (porDiaMes) return porDiaMes
+  }
+
+  return null
+}
+
+async function vagasRestantes(turmaInput: string): Promise<{ encontrada: boolean; vagas_restantes: number; status: string; slug?: string }> {
+  const turma = await resolverTurma(turmaInput)
   if (!turma) return { encontrada: false, vagas_restantes: 0, status: 'nao_encontrada' }
 
   const limiteReserva = new Date(Date.now() - TRINTA_MINUTOS_MS).toISOString()
@@ -123,7 +148,7 @@ async function vagasRestantes(slug: string): Promise<{ encontrada: boolean; vaga
     .or(`status.eq.aprovado,and(status.eq.pendente,created_at.gt.${limiteReserva})`)
 
   const restantes = Math.max(turma.vagas_total - (count ?? 0), 0)
-  return { encontrada: true, vagas_restantes: restantes, status: restantes > 0 ? turma.status : 'esgotada' }
+  return { encontrada: true, vagas_restantes: restantes, status: restantes > 0 ? turma.status : 'esgotada', slug: turma.slug }
 }
 
 async function executarFerramenta(
@@ -138,11 +163,10 @@ async function executarFerramenta(
     }
 
     case 'enviar_link_checkout': {
-      const slug = String(input.turma ?? '')
       const cupomCodigo = input.cupom ? String(input.cupom).trim() : null
 
-      const { data: turma } = await supabaseAdmin.from('turmas').select('id').eq('slug', slug).maybeSingle()
-      if (!turma) return { erro: 'Turma não encontrada.' }
+      const turma = await resolverTurma(String(input.turma ?? ''))
+      if (!turma) return { erro: 'Turma não encontrada. Confirme a data da turma antes de tentar de novo.' }
 
       let cupomValido: string | null = null
       if (cupomCodigo) {
@@ -161,7 +185,7 @@ async function executarFerramenta(
 
       const params = new URLSearchParams({
         lead: conversa.lead_id ?? '',
-        turma: slug,
+        turma: turma.slug,
         utm_source: 'bot',
         utm_medium: conversa.canal,
       })
