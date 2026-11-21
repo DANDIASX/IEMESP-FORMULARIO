@@ -33,6 +33,19 @@ export async function enviarNotificacaoTelegram(lead: LeadParaNotificar) {
     lead.origem ? `Origem: ${lead.origem}${lead.utm_source ? ` (${lead.utm_source})` : ''}` : null,
   ].filter(Boolean).join('\n')
 
+  await enviarTextoTelegram(texto)
+}
+
+// Texto livre pro Telegram — usado pelo bot (avisos do notificar_danilo, falhas da API, rascunhos em modo aprovação).
+// Nunca lança erro, mesmo assim: uma falha aqui não pode travar a resposta do bot.
+export async function enviarTextoTelegram(texto: string) {
+  const botToken = Deno.env.get('TELEGRAM_BOT_TOKEN')
+  const chatId = Deno.env.get('TELEGRAM_CHAT_ID')
+  if (!botToken || !chatId) {
+    console.error('TELEGRAM_BOT_TOKEN ou TELEGRAM_CHAT_ID não configuradas — notificação não enviada.')
+    return
+  }
+
   try {
     const res = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
       method: 'POST',

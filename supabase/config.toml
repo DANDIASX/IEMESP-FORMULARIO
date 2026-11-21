@@ -27,3 +27,12 @@ verify_jwt = true
 
 [functions.notificar-novo-lead]
 verify_jwt = true
+
+[functions.bot-responder]
+verify_jwt = true
+
+# Chamada pelo projeto Supabase separado do Financeiro, não por um
+# usuário logado neste projeto — protegida por chave compartilhada
+# própria (x-financeiro-key), não pelo JWT do Supabase.
+[functions.relatorio-financeiro]
+verify_jwt = false
