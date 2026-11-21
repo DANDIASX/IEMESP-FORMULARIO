@@ -156,6 +156,7 @@ async function executarFerramenta(
   nome: string,
   input: Record<string, unknown>,
   conversa: Conversa,
+  avisos: string[],
 ): Promise<unknown> {
   switch (nome) {
     case 'consultar_vagas': {
@@ -270,18 +271,25 @@ async function executarFerramenta(
         .single()
 
       const avisoId = avisoRow?.id
-      const botoes = [
-        [
-          { text: 'Assumir conversa', callback_data: `av:assumir:${avisoId}` },
-          { text: 'Devolver ao bot', callback_data: `av:devolver:${avisoId}` },
-        ],
-        sugestao ? [{ text: 'Enviar sugestão', callback_data: `av:sugestao:${avisoId}` }] : [],
-        [{ text: 'Abrir no CRM', url: 'https://crm.iemesp.com.br/pipeline' }],
-      ].filter((linha) => linha.length > 0)
 
-      const messageId = avisoId ? await enviarTelegramComBotoes(texto, botoes) : null
-      if (avisoId && messageId) {
-        await supabaseAdmin.from('bot_avisos').update({ telegram_message_id: messageId }).eq('id', avisoId)
+      if (conversa.canal === 'teste') {
+        // No simulador não mandamos nada de verdade pro Telegram — só mostramos o
+        // que teria sido enviado.
+        avisos.push(texto)
+      } else {
+        const botoes = [
+          [
+            { text: 'Assumir conversa', callback_data: `av:assumir:${avisoId}` },
+            { text: 'Devolver ao bot', callback_data: `av:devolver:${avisoId}` },
+          ],
+          sugestao ? [{ text: 'Enviar sugestão', callback_data: `av:sugestao:${avisoId}` }] : [],
+          [{ text: 'Abrir no CRM', url: 'https://crm.iemesp.com.br/pipeline' }],
+        ].filter((linha) => linha.length > 0)
+
+        const messageId = avisoId ? await enviarTelegramComBotoes(texto, botoes) : null
+        if (avisoId && messageId) {
+          await supabaseAdmin.from('bot_avisos').update({ telegram_message_id: messageId }).eq('id', avisoId)
+        }
       }
 
       if (prioridade === 'alta') {
@@ -296,7 +304,9 @@ async function executarFerramenta(
 }
 
 // Espera o lead parar de mandar mensagens picadas antes de responder (30s de silêncio, até 120s de espera total).
-async function esperarAgrupamento(conversaId: string): Promise<void> {
+// No simulador (canal 'teste') não tem sentido esperar — o Danilo está testando uma mensagem de cada vez.
+async function esperarAgrupamento(conversaId: string, canal: string): Promise<void> {
+  if (canal === 'teste') return
   const inicio = Date.now()
   while (true) {
     const { data } = await supabaseAdmin
@@ -350,7 +360,7 @@ Deno.serve(async (req: Request) => {
     return jsonResponse(req, { ok: true, pulado: 'pausado' })
   }
 
-  await esperarAgrupamento(conversaId)
+  await esperarAgrupamento(conversaId, conversa.canal)
 
   const { data: config } = await supabaseAdmin
     .from('bot_config')
@@ -361,7 +371,9 @@ Deno.serve(async (req: Request) => {
     .maybeSingle()
 
   if (!config) {
-    await enviarTextoTelegram(`⚠️ Bot falhou: nenhum bot_config ativo encontrado. conversa_id=${conversaId}`)
+    if (conversa.canal !== 'teste') {
+      await enviarTextoTelegram(`⚠️ Bot falhou: nenhum bot_config ativo encontrado. conversa_id=${conversaId}`)
+    }
     return jsonResponse(req, { error: 'Nenhuma configuração ativa do bot.' }, 500)
   }
 
@@ -386,6 +398,13 @@ Deno.serve(async (req: Request) => {
 
   const historicoOrdenado = (historico ?? []).slice().reverse()
 
+  // Se a conversa não termina com uma mensagem do lead (ex.: chamada duplicada, retry de
+  // webhook), não tem o que responder — e o modelo recusa gerar texto nessa situação.
+  const ultima = historicoOrdenado[historicoOrdenado.length - 1]
+  if (!ultima || ultima.autor !== 'lead') {
+    return jsonResponse(req, { ok: true, pulado: 'sem_mensagem_nova_do_lead' })
+  }
+
   const contextoLead = lead
     ? [
         '[CONTEXTO INTERNO — dados do formulário, não é mensagem do lead. Use sem perguntar de novo.]',
@@ -408,12 +427,15 @@ Deno.serve(async (req: Request) => {
     })),
   ]
 
+  const avisos: string[] = []
+  const ferramentas: { nome: string; input: Record<string, unknown>; resultado: unknown }[] = []
+
   let respostaFinal: Anthropic.Message
   try {
     for (let rodada = 0; ; rodada++) {
       const resposta = await anthropic.messages.create({
         model: MODELO,
-        max_tokens: 2048,
+        max_tokens: 4096,
         system: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }],
         tools: TOOLS,
         output_config: { effort: 'medium' },
@@ -430,14 +452,18 @@ Deno.serve(async (req: Request) => {
       const toolUseBlocks = resposta.content.filter((b): b is Anthropic.ToolUseBlock => b.type === 'tool_use')
       const toolResults: Anthropic.ToolResultBlockParam[] = []
       for (const bloco of toolUseBlocks) {
-        const resultado = await executarFerramenta(bloco.name, bloco.input as Record<string, unknown>, conversa)
+        const input = bloco.input as Record<string, unknown>
+        const resultado = await executarFerramenta(bloco.name, input, conversa, avisos)
+        ferramentas.push({ nome: bloco.name, input, resultado })
         toolResults.push({ type: 'tool_result', tool_use_id: bloco.id, content: JSON.stringify(resultado) })
       }
       messages.push({ role: 'user', content: toolResults })
     }
   } catch (err) {
     console.error('Erro ao chamar a API da Anthropic:', err)
-    await enviarTextoTelegram(`⚠️ Bot falhou ao responder, responda manualmente. conversa_id=${conversaId}`)
+    if (conversa.canal !== 'teste') {
+      await enviarTextoTelegram(`⚠️ Bot falhou ao responder, responda manualmente. conversa_id=${conversaId}`)
+    }
     return jsonResponse(req, { error: 'Falha ao gerar resposta.' }, 500)
   }
 
@@ -448,7 +474,14 @@ Deno.serve(async (req: Request) => {
     .trim()
 
   if (!textoFinal) {
-    return jsonResponse(req, { ok: true, mensagens: [] })
+    // Não dá pra mandar mensagem nenhuma pro lead sem texto — melhor avisar o Danilo
+    // do que deixar a conversa muda. stop_reason ajuda a entender a causa (ex.: max_tokens).
+    if (conversa.canal !== 'teste') {
+      await enviarTextoTelegram(
+        `⚠️ Bot não conseguiu gerar resposta (motivo: ${respostaFinal.stop_reason}), responda manualmente. conversa_id=${conversaId}`,
+      )
+    }
+    return jsonResponse(req, { ok: true, mensagens: [], ferramentas, avisos, stop_reason: respostaFinal.stop_reason })
   }
 
   // No máximo 2 mensagens por resposta — junta qualquer parágrafo extra no segundo bloco.
@@ -464,21 +497,26 @@ Deno.serve(async (req: Request) => {
       .single()
 
     const rascunhoId = rascunhoRow?.id
-    const messageId = rascunhoId
-      ? await enviarTelegramComBotoes(`📝 Rascunho pendente de aprovação:\n\n${rascunho}`, [
-          [
-            { text: 'Enviar', callback_data: `rs:enviar:${rascunhoId}` },
-            { text: 'Editar', callback_data: `rs:editar:${rascunhoId}` },
-            { text: 'Assumir', callback_data: `rs:assumir:${rascunhoId}` },
-          ],
-        ])
-      : null
 
-    if (rascunhoId && messageId) {
-      await supabaseAdmin.from('rascunhos').update({ telegram_message_id: messageId }).eq('id', rascunhoId)
+    if (conversa.canal === 'teste') {
+      avisos.push(`[rascunho — modo aprovação]\n${rascunho}`)
+    } else {
+      const messageId = rascunhoId
+        ? await enviarTelegramComBotoes(`📝 Rascunho pendente de aprovação:\n\n${rascunho}`, [
+            [
+              { text: 'Enviar', callback_data: `rs:enviar:${rascunhoId}` },
+              { text: 'Editar', callback_data: `rs:editar:${rascunhoId}` },
+              { text: 'Assumir', callback_data: `rs:assumir:${rascunhoId}` },
+            ],
+          ])
+        : null
+
+      if (rascunhoId && messageId) {
+        await supabaseAdmin.from('rascunhos').update({ telegram_message_id: messageId }).eq('id', rascunhoId)
+      }
     }
 
-    return jsonResponse(req, { ok: true, modo: 'aprovacao', rascunho })
+    return jsonResponse(req, { ok: true, modo: 'aprovacao', rascunho, ferramentas, avisos })
   }
 
   for (const texto of partes) {
@@ -493,5 +531,5 @@ Deno.serve(async (req: Request) => {
   }
   await marcarLeadContatado(conversa.lead_id)
 
-  return jsonResponse(req, { ok: true, mensagens: partes })
+  return jsonResponse(req, { ok: true, mensagens: partes, ferramentas, avisos })
 })

@@ -1,6 +1,6 @@
 PRODUTO: Procedimentos 2.0, curso prático presencial de procedimentos de emergência.
 PREÇO: Pix R$ 2.098 à vista. Cartão em até 6x de R$ 383 sem juros (total R$ 2.298). Lote promocional.
-VAGAS: 18 por turma. Número restante sempre via consultar_vagas.
+VAGAS: 18 por turma. Não informe esse número nem quantas restam ao lead — use consultar_vagas só internamente para saber se a turma ainda está aberta.
 TURMAS: 23/01/2027 e 20/02/2027, das 8h às 18h.
 LOCAL: Perdizes, São Paulo (SP). Estacionamento incluso. Endereço completo: A_PREENCHER (até lá, diga que o endereço vai na confirmação da inscrição e chame notificar_danilo se a pessoa insistir).
 CERTIFICADO: emitido pelo IEMESP, 10 horas.
