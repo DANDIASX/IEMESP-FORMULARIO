@@ -1,7 +1,8 @@
 import Anthropic from 'npm:@anthropic-ai/sdk@1.12.0'
 import { handleOptions, jsonResponse } from '../_shared/cors.ts'
 import { supabaseAdmin } from '../_shared/supabaseAdmin.ts'
-import { enviarTextoTelegram } from '../_shared/notify.ts'
+import { enviarTextoTelegram, enviarTelegramComBotoes } from '../_shared/notify.ts'
+import { marcarLeadContatado } from '../_shared/leads.ts'
 
 const MODELO = 'claude-sonnet-5-5'
 const MAX_MENSAGENS_HISTORICO = 30
@@ -247,15 +248,42 @@ async function executarFerramenta(
 
     case 'notificar_danilo': {
       const prioridade = String(input.prioridade ?? 'media')
+      const sugestao = input.sugestao_de_resposta ? String(input.sugestao_de_resposta) : null
       const emoji = prioridade === 'alta' ? '🔴' : prioridade === 'media' ? '🟡' : '🟢'
       const texto = [
         `${emoji} Bot — aviso (${prioridade})`,
         `Motivo: ${input.motivo ?? '-'}`,
         `Resumo: ${input.resumo ?? '-'}`,
-        input.sugestao_de_resposta ? `Sugestão: ${input.sugestao_de_resposta}` : null,
-        `Conversa: ${conversa.id}`,
+        sugestao ? `Sugestão: ${sugestao}` : null,
       ].filter(Boolean).join('\n')
-      await enviarTextoTelegram(texto)
+
+      const { data: avisoRow } = await supabaseAdmin
+        .from('bot_avisos')
+        .insert({
+          conversa_id: conversa.id,
+          prioridade,
+          motivo: input.motivo ?? null,
+          resumo: input.resumo ?? null,
+          sugestao_de_resposta: sugestao,
+        })
+        .select('id')
+        .single()
+
+      const avisoId = avisoRow?.id
+      const botoes = [
+        [
+          { text: 'Assumir conversa', callback_data: `av:assumir:${avisoId}` },
+          { text: 'Devolver ao bot', callback_data: `av:devolver:${avisoId}` },
+        ],
+        sugestao ? [{ text: 'Enviar sugestão', callback_data: `av:sugestao:${avisoId}` }] : [],
+        [{ text: 'Abrir no CRM', url: 'https://crm.iemesp.com.br/pipeline' }],
+      ].filter((linha) => linha.length > 0)
+
+      const messageId = avisoId ? await enviarTelegramComBotoes(texto, botoes) : null
+      if (avisoId && messageId) {
+        await supabaseAdmin.from('bot_avisos').update({ telegram_message_id: messageId }).eq('id', avisoId)
+      }
+
       if (prioridade === 'alta') {
         await supabaseAdmin.from('conversas').update({ estado: 'pausado' }).eq('id', conversa.id)
       }
@@ -429,8 +457,27 @@ Deno.serve(async (req: Request) => {
 
   if (conversa.modo === 'aprovacao') {
     const rascunho = partes.join('\n\n')
-    await supabaseAdmin.from('rascunhos').insert({ conversa_id: conversaId, texto: rascunho, status: 'pendente' })
-    await enviarTextoTelegram(`📝 Rascunho pendente de aprovação (conversa ${conversaId}):\n\n${rascunho}`)
+    const { data: rascunhoRow } = await supabaseAdmin
+      .from('rascunhos')
+      .insert({ conversa_id: conversaId, texto: rascunho, status: 'pendente' })
+      .select('id')
+      .single()
+
+    const rascunhoId = rascunhoRow?.id
+    const messageId = rascunhoId
+      ? await enviarTelegramComBotoes(`📝 Rascunho pendente de aprovação:\n\n${rascunho}`, [
+          [
+            { text: 'Enviar', callback_data: `rs:enviar:${rascunhoId}` },
+            { text: 'Editar', callback_data: `rs:editar:${rascunhoId}` },
+            { text: 'Assumir', callback_data: `rs:assumir:${rascunhoId}` },
+          ],
+        ])
+      : null
+
+    if (rascunhoId && messageId) {
+      await supabaseAdmin.from('rascunhos').update({ telegram_message_id: messageId }).eq('id', rascunhoId)
+    }
+
     return jsonResponse(req, { ok: true, modo: 'aprovacao', rascunho })
   }
 
@@ -444,6 +491,7 @@ Deno.serve(async (req: Request) => {
       tokens_saida: respostaFinal.usage.output_tokens,
     })
   }
+  await marcarLeadContatado(conversa.lead_id)
 
   return jsonResponse(req, { ok: true, mensagens: partes })
 })

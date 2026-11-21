@@ -65,3 +65,17 @@ export async function encontrarOuCriarLead(dados: DadosLead): Promise<string | n
 
   return novoLead.id
 }
+
+// Chamado sempre que uma mensagem de verdade sai pro lead (bot, rascunho aprovado ou
+// sugestão enviada pelo Danilo) — garante que o card nunca fique parado em "novo"
+// esquecido, sem depender do modelo lembrar de chamar atualizar_etapa.
+export async function marcarLeadContatado(leadId: string | null) {
+  if (!leadId) return
+  const { data: lead } = await supabaseAdmin.from('leads').select('pipeline_stage').eq('id', leadId).maybeSingle()
+  if (lead && lead.pipeline_stage === 'novo') {
+    await supabaseAdmin
+      .from('leads')
+      .update({ pipeline_stage: 'contatado', stage_updated_at: new Date().toISOString() })
+      .eq('id', leadId)
+  }
+}

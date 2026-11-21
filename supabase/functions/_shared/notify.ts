@@ -59,3 +59,34 @@ export async function enviarTextoTelegram(texto: string) {
     console.error('Erro ao chamar API do Telegram:', err)
   }
 }
+
+export type BotaoTelegram = { text: string; callback_data?: string; url?: string }
+
+// Igual a enviarTextoTelegram, mas com botões inline, e devolve o message_id
+// (precisamos dele pra ligar um toque de botão, ou uma resposta por reply, de volta
+// à conversa certa). Também nunca lança erro.
+export async function enviarTelegramComBotoes(texto: string, botoes: BotaoTelegram[][]): Promise<number | null> {
+  const botToken = Deno.env.get('TELEGRAM_BOT_TOKEN')
+  const chatId = Deno.env.get('TELEGRAM_CHAT_ID')
+  if (!botToken || !chatId) {
+    console.error('TELEGRAM_BOT_TOKEN ou TELEGRAM_CHAT_ID não configuradas — notificação não enviada.')
+    return null
+  }
+
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: chatId, text: texto, reply_markup: { inline_keyboard: botoes } }),
+    })
+    const data = await res.json()
+    if (!data.ok) {
+      console.error('Erro ao enviar notificação Telegram com botões:', data)
+      return null
+    }
+    return data.result.message_id as number
+  } catch (err) {
+    console.error('Erro ao chamar API do Telegram:', err)
+    return null
+  }
+}

@@ -31,6 +31,12 @@ verify_jwt = true
 [functions.bot-responder]
 verify_jwt = true
 
+[functions.telegram-callback]
+verify_jwt = false
+
+[functions.resumo-diario]
+verify_jwt = false
+
 # Chamada pelo projeto Supabase separado do Financeiro, não por um
 # usuário logado neste projeto — protegida por chave compartilhada
 # própria (x-financeiro-key), não pelo JWT do Supabase.
