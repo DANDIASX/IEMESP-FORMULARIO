@@ -1,5 +1,6 @@
 const ALLOWED_ORIGINS = [
   'https://formulario.iemesp.com.br',
+  'https://crm.iemesp.com.br',
   'http://localhost:5173',
   'http://localhost:5174',
 ]
