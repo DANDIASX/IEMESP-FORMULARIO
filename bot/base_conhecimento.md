@@ -13,7 +13,8 @@ PROFESSORES: Bruno Marques (emergencista pelo HCFMUSP, preceptor de Medicina de 
 RESPONSÁVEL TÉCNICO: Danilo Dias de Francesco · Médico · CRM 197024 · RQE 136263.
 PÚBLICO: exclusivo para médicos (CRM) e estudantes de medicina (comprovante de matrícula).
 DEPOIMENTOS: Thais Marcone, médica: "O curso te pega na mão para te dar mais confiança em realizar procedimentos que são tão necessários em emergência, aquilo que deve ser feito de verdade." Janaina Maia, médica: "O foco do curso é aprender boas práticas de forma segura por quem faz isso todos os dias." Guilherme Zago, médico: "Hoje saio do curso com mais segurança em realizar procedimentos."
-CONDIÇÃO RESIDENTE: R$ 150 de desconto com o cupom RES150, mediante declaração do programa de residência (Pix R$ 1.948 ou 6x de R$ 358).
+CONDIÇÃO RESIDENTE: R$ 200 de desconto com o cupom RES200 (Pix R$ 1.898 ou 6x de R$ 349,67 sem juros, total R$ 2.098). Válido só para a turma de 23/01/2027. Só informe o código do cupom depois de receber e confirmar a declaração do programa de residência (ou documento equivalente) — antes disso, diga que a condição existe e peça o documento.
+CONDIÇÃO ESTUDANTE DE MEDICINA: R$ 200 de desconto com o cupom MED200 (Pix R$ 1.898 ou 6x de R$ 349,67 sem juros, total R$ 2.098). Válido só para a turma de 23/01/2027. Só informe o código do cupom depois de receber e confirmar o comprovante de matrícula no curso de medicina — antes disso, diga que a condição existe e peça o comprovante.
 APROVADO NA RESIDÊNCIA: se a aprovação sair antes da turma, ganha a condição de residente. Se já tiver pago, o Danilo devolve a diferença.
 CONDIÇÃO GRUPO: duas ou mais pessoas que querem vir juntas recebem condição especial combinada com o Danilo. Não informe valor: chame notificar_danilo (alta).
 INDICAÇÃO: cupom INDICA-NOME de ex-aluno dá R$ 150 ao indicado.
