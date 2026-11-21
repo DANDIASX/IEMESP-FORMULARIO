@@ -109,5 +109,9 @@ drop policy if exists bot_arquivos_authenticated on storage.objects;
 create policy bot_arquivos_authenticated on storage.objects for all to authenticated
   using (bucket_id = 'bot-arquivos') with check (bucket_id = 'bot-arquivos');
 
+-- Tabelas criadas direto por SQL (fora do Studio) não herdam o GRANT automático do Supabase —
+-- sem isso, service_role (usado pela Edge Function) toma "permission denied" mesmo com RLS correto.
+grant select, insert, update, delete on public.bot_config, public.conversas, public.mensagens, public.rascunhos, public.pedidos_data, public.lista_interesse to authenticated, service_role;
+
 -- Carrega a primeira versão do prompt e da base de conhecimento (conteúdo em bot/prompt_sistema.md e bot/base_conhecimento.md).
 -- O texto é inserido por uma query separada (evita escapar milhares de caracteres aqui).
