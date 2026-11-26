@@ -13,15 +13,21 @@ const PRODUTO_LABEL: Record<string, string> = {
   ambos: 'Curso + Plataforma',
 }
 
+// 3 grupos separados no Telegram, pra não misturar tudo num só:
+// - ATENCAO (TELEGRAM_CHAT_ID): o bot precisa de você — notificar_danilo, rascunho
+//   esperando aprovação, arquivo recebido do lead.
+// - LEADS (TELEGRAM_CHAT_ID_LEADS): lead novo chegou (formulário ou WhatsApp).
+// - ERROS (TELEGRAM_CHAT_ID_ERROS): o bot falhou em alguma coisa.
+export type DestinoTelegram = 'atencao' | 'leads' | 'erros'
+
+function chatIdDoDestino(destino: DestinoTelegram): string | undefined {
+  if (destino === 'leads') return Deno.env.get('TELEGRAM_CHAT_ID_LEADS') ?? Deno.env.get('TELEGRAM_CHAT_ID')
+  if (destino === 'erros') return Deno.env.get('TELEGRAM_CHAT_ID_ERROS') ?? Deno.env.get('TELEGRAM_CHAT_ID')
+  return Deno.env.get('TELEGRAM_CHAT_ID')
+}
+
 // Nunca lança erro — uma falha aqui não pode derrubar o cadastro do lead.
 export async function enviarNotificacaoTelegram(lead: LeadParaNotificar) {
-  const botToken = Deno.env.get('TELEGRAM_BOT_TOKEN')
-  const chatId = Deno.env.get('TELEGRAM_CHAT_ID')
-  if (!botToken || !chatId) {
-    console.error('TELEGRAM_BOT_TOKEN ou TELEGRAM_CHAT_ID não configuradas — notificação não enviada.')
-    return
-  }
-
   const produto = lead.produto_interesse ? (PRODUTO_LABEL[lead.produto_interesse] ?? lead.produto_interesse) : null
 
   const texto = [
@@ -33,16 +39,17 @@ export async function enviarNotificacaoTelegram(lead: LeadParaNotificar) {
     lead.origem ? `Origem: ${lead.origem}${lead.utm_source ? ` (${lead.utm_source})` : ''}` : null,
   ].filter(Boolean).join('\n')
 
-  await enviarTextoTelegram(texto)
+  await enviarTextoTelegram(texto, 'leads')
 }
 
-// Texto livre pro Telegram — usado pelo bot (avisos do notificar_danilo, falhas da API, rascunhos em modo aprovação).
+// Texto livre pro Telegram. Por padrão vai pro grupo "Preciso de você" (atencao);
+// passe `destino` pra mandar pros outros dois grupos.
 // Nunca lança erro, mesmo assim: uma falha aqui não pode travar a resposta do bot.
-export async function enviarTextoTelegram(texto: string) {
+export async function enviarTextoTelegram(texto: string, destino: DestinoTelegram = 'atencao') {
   const botToken = Deno.env.get('TELEGRAM_BOT_TOKEN')
-  const chatId = Deno.env.get('TELEGRAM_CHAT_ID')
+  const chatId = chatIdDoDestino(destino)
   if (!botToken || !chatId) {
-    console.error('TELEGRAM_BOT_TOKEN ou TELEGRAM_CHAT_ID não configuradas — notificação não enviada.')
+    console.error(`TELEGRAM_BOT_TOKEN ou chat do destino "${destino}" não configurado — notificação não enviada.`)
     return
   }
 
@@ -64,10 +71,11 @@ export type BotaoTelegram = { text: string; callback_data?: string; url?: string
 
 // Igual a enviarTextoTelegram, mas com botões inline, e devolve o message_id
 // (precisamos dele pra ligar um toque de botão, ou uma resposta por reply, de volta
-// à conversa certa). Também nunca lança erro.
+// à conversa certa). Sempre vai pro grupo "Preciso de você" — é lá que moram os botões
+// e as respostas por reply. Também nunca lança erro.
 export async function enviarTelegramComBotoes(texto: string, botoes: BotaoTelegram[][]): Promise<number | null> {
   const botToken = Deno.env.get('TELEGRAM_BOT_TOKEN')
-  const chatId = Deno.env.get('TELEGRAM_CHAT_ID')
+  const chatId = chatIdDoDestino('atencao')
   if (!botToken || !chatId) {
     console.error('TELEGRAM_BOT_TOKEN ou TELEGRAM_CHAT_ID não configuradas — notificação não enviada.')
     return null

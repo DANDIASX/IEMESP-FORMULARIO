@@ -1,10 +1,30 @@
 import { supabaseAdmin } from '../_shared/supabaseAdmin.ts'
 import { enviarTextoTelegram } from '../_shared/notify.ts'
 import { marcarLeadContatado } from '../_shared/leads.ts'
+import { enviarMensagemWhatsapp } from '../_shared/whatsapp.ts'
 
 async function leadDaConversa(conversaId: string): Promise<string | null> {
   const { data } = await supabaseAdmin.from('conversas').select('lead_id').eq('id', conversaId).maybeSingle()
   return data?.lead_id ?? null
+}
+
+// Além de gravar no banco, manda de verdade pelo WhatsApp quando a conversa for desse canal.
+async function enviarParaLeadSeWhatsapp(conversaId: string, texto: string): Promise<string | null> {
+  const { data: conversa } = await supabaseAdmin
+    .from('conversas')
+    .select('canal, contato_externo_id')
+    .eq('id', conversaId)
+    .maybeSingle()
+
+  if (conversa?.canal === 'whatsapp' && conversa.contato_externo_id) {
+    const envio = await enviarMensagemWhatsapp(conversa.contato_externo_id, texto)
+    if (!envio.ok) {
+      await enviarTextoTelegram(`⚠️ Falha ao enviar pelo WhatsApp (conversa ${conversaId}): ${JSON.stringify(envio.erro)}`, 'erros')
+      return null
+    }
+    return envio.id ?? null
+  }
+  return null
 }
 
 const URL_DESTA_FUNCAO = 'https://qoxfkbytyvauhpoevaxp.supabase.co/functions/v1/telegram-callback'
@@ -39,11 +59,13 @@ async function tratarCallback(cq: { id: string; data?: string }) {
 
     if (acao === 'sugestao') {
       if (!aviso.sugestao_de_resposta) return responderCallback(cq.id, 'Não há sugestão registrada para esta conversa.')
+      const canalMsgId = await enviarParaLeadSeWhatsapp(aviso.conversa_id, aviso.sugestao_de_resposta)
       await supabaseAdmin.from('mensagens').insert({
         conversa_id: aviso.conversa_id,
         direcao: 'saida',
         autor: 'danilo',
         texto: aviso.sugestao_de_resposta,
+        canal_msg_id: canalMsgId,
       })
       await supabaseAdmin.from('conversas').update({ estado: 'bot' }).eq('id', aviso.conversa_id)
       await supabaseAdmin.from('bot_avisos').update({ resolvido: true }).eq('id', id)
@@ -68,7 +90,8 @@ async function tratarCallback(cq: { id: string; data?: string }) {
       const blocos = String(rascunho.texto).split(/\n\n+/).filter(Boolean)
       const finais = blocos.length <= 2 ? blocos : [blocos[0], blocos.slice(1).join('\n\n')]
       for (const texto of finais) {
-        await supabaseAdmin.from('mensagens').insert({ conversa_id: rascunho.conversa_id, direcao: 'saida', autor: 'bot', texto })
+        const canalMsgId = await enviarParaLeadSeWhatsapp(rascunho.conversa_id, texto)
+        await supabaseAdmin.from('mensagens').insert({ conversa_id: rascunho.conversa_id, direcao: 'saida', autor: 'bot', texto, canal_msg_id: canalMsgId })
       }
       await supabaseAdmin.from('rascunhos').update({ status: 'enviado' }).eq('id', id)
       await marcarLeadContatado(await leadDaConversa(rascunho.conversa_id))
@@ -105,11 +128,13 @@ async function tratarResposta(msg: { reply_to_message?: { message_id?: number };
 
   if (!rascunho) return
 
+  const canalMsgId = await enviarParaLeadSeWhatsapp(rascunho.conversa_id, novoTexto)
   await supabaseAdmin.from('mensagens').insert({
     conversa_id: rascunho.conversa_id,
     direcao: 'saida',
     autor: 'danilo',
     texto: novoTexto,
+    canal_msg_id: canalMsgId,
   })
   await supabaseAdmin.from('rascunhos').update({ status: 'editado', texto: novoTexto }).eq('id', rascunho.id)
   await marcarLeadContatado(await leadDaConversa(rascunho.conversa_id))

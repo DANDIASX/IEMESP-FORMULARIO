@@ -17,6 +17,7 @@ export default function LeadForm(){
   })
   const [form, setForm] = useState<any>({
     nome: '', email: '', telefone: '', instituicao: '', cargo: '', consentimento_lgpd: false,
+    aceite_whatsapp: false,
     objetivo: '', instagram: '', tiktok: ''
   })
   const [loading, setLoading] = useState(false)
@@ -62,6 +63,9 @@ export default function LeadForm(){
       objetivo: form.objetivo || null,
       origem: 'formulario',
       consentimento_lgpd: form.consentimento_lgpd,
+      aceite_whatsapp: form.aceite_whatsapp,
+      aceite_whatsapp_em: form.aceite_whatsapp ? new Date().toISOString() : null,
+      aceite_whatsapp_origem: form.aceite_whatsapp ? 'formulario' : null,
       utm_source: attribution.utm_source,
       utm_medium: attribution.utm_medium,
       utm_campaign: attribution.utm_campaign,
@@ -192,6 +196,13 @@ export default function LeadForm(){
         <label className="flex items-start gap-2">
           <input type="checkbox" checked={form.consentimento_lgpd} onChange={e=>handleChange('consentimento_lgpd', e.target.checked)} />
           <span>Dou meu consentimento para uso dos meus dados conforme a LGPD. Autorizo contato para fins educacionais e comerciais.</span>
+        </label>
+      </div>
+
+      <div className="text-sm">
+        <label className="flex items-start gap-2">
+          <input type="checkbox" checked={form.aceite_whatsapp} onChange={e=>handleChange('aceite_whatsapp', e.target.checked)} />
+          <span>Aceito receber mensagens sobre o curso pelo WhatsApp.</span>
         </label>
       </div>
 

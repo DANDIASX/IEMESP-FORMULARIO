@@ -3,6 +3,7 @@ import { handleOptions, jsonResponse } from '../_shared/cors.ts'
 import { supabaseAdmin } from '../_shared/supabaseAdmin.ts'
 import { enviarTextoTelegram, enviarTelegramComBotoes } from '../_shared/notify.ts'
 import { marcarLeadContatado } from '../_shared/leads.ts'
+import { enviarMensagemWhatsapp, enviarDocumentoWhatsapp } from '../_shared/whatsapp.ts'
 
 const MODELO = 'claude-sonnet-5-5'
 const MAX_MENSAGENS_HISTORICO = 30
@@ -17,6 +18,7 @@ type Conversa = {
   id: string
   lead_id: string | null
   canal: string
+  contato_externo_id: string | null
   estado: string
   modo: string
   etapa: string | null
@@ -203,6 +205,20 @@ async function executarFerramenta(
       if (!data?.signedUrl) {
         return { enviado: false, motivo: 'O PDF de apresentação ainda não foi cadastrado no Supabase Storage.' }
       }
+
+      if (conversa.canal === 'whatsapp' && conversa.contato_externo_id) {
+        const envio = await enviarDocumentoWhatsapp(conversa.contato_externo_id, data.signedUrl, 'Procedimentos 2.0 - IEMESP.pdf')
+        if (!envio.ok) return { enviado: false, motivo: 'Falha ao enviar o PDF pelo WhatsApp.' }
+        await supabaseAdmin.from('mensagens').insert({
+          conversa_id: conversa.id,
+          direcao: 'saida',
+          autor: 'bot',
+          texto: '[PDF de apresentação enviado]',
+          midia_url: data.signedUrl,
+          canal_msg_id: envio.id ?? null,
+        })
+      }
+
       return { enviado: true, url: data.signedUrl }
     }
 
@@ -348,7 +364,7 @@ Deno.serve(async (req: Request) => {
 
   const { data: conversa } = await supabaseAdmin
     .from('conversas')
-    .select('id, lead_id, canal, estado, modo, etapa, optout, pausado_ate')
+    .select('id, lead_id, canal, contato_externo_id, estado, modo, etapa, optout, pausado_ate')
     .eq('id', conversaId)
     .maybeSingle<Conversa>()
 
@@ -372,7 +388,7 @@ Deno.serve(async (req: Request) => {
 
   if (!config) {
     if (conversa.canal !== 'teste') {
-      await enviarTextoTelegram(`⚠️ Bot falhou: nenhum bot_config ativo encontrado. conversa_id=${conversaId}`)
+      await enviarTextoTelegram(`⚠️ Bot falhou: nenhum bot_config ativo encontrado. conversa_id=${conversaId}`, 'erros')
     }
     return jsonResponse(req, { error: 'Nenhuma configuração ativa do bot.' }, 500)
   }
@@ -462,7 +478,7 @@ Deno.serve(async (req: Request) => {
   } catch (err) {
     console.error('Erro ao chamar a API da Anthropic:', err)
     if (conversa.canal !== 'teste') {
-      await enviarTextoTelegram(`⚠️ Bot falhou ao responder, responda manualmente. conversa_id=${conversaId}`)
+      await enviarTextoTelegram(`⚠️ Bot falhou ao responder, responda manualmente. conversa_id=${conversaId}`, 'erros')
     }
     return jsonResponse(req, { error: 'Falha ao gerar resposta.' }, 500)
   }
@@ -479,6 +495,7 @@ Deno.serve(async (req: Request) => {
     if (conversa.canal !== 'teste') {
       await enviarTextoTelegram(
         `⚠️ Bot não conseguiu gerar resposta (motivo: ${respostaFinal.stop_reason}), responda manualmente. conversa_id=${conversaId}`,
+        'erros',
       )
     }
     return jsonResponse(req, { ok: true, mensagens: [], ferramentas, avisos, stop_reason: respostaFinal.stop_reason })
@@ -520,11 +537,21 @@ Deno.serve(async (req: Request) => {
   }
 
   for (const texto of partes) {
+    let canalMsgId: string | null = null
+    if (conversa.canal === 'whatsapp' && conversa.contato_externo_id) {
+      const envio = await enviarMensagemWhatsapp(conversa.contato_externo_id, texto)
+      if (envio.ok) {
+        canalMsgId = envio.id ?? null
+      } else {
+        await enviarTextoTelegram(`⚠️ Falha ao enviar mensagem pelo WhatsApp (conversa ${conversaId}): ${JSON.stringify(envio.erro)}`, 'erros')
+      }
+    }
     await supabaseAdmin.from('mensagens').insert({
       conversa_id: conversaId,
       direcao: 'saida',
       autor: 'bot',
       texto,
+      canal_msg_id: canalMsgId,
       tokens_entrada: respostaFinal.usage.input_tokens,
       tokens_saida: respostaFinal.usage.output_tokens,
     })

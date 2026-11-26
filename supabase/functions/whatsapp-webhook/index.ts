@@ -91,7 +91,7 @@ async function encontrarOuCriarConversa(contatoExternoId: string, leadId: string
     .eq('contato_externo_id', contatoExternoId)
     .maybeSingle()
 
-  if (existente) return existente
+  if (existente) return { conversa: existente, novaConversa: false }
 
   const { data: nova } = await supabaseAdmin
     .from('conversas')
@@ -99,7 +99,7 @@ async function encontrarOuCriarConversa(contatoExternoId: string, leadId: string
     .select('*')
     .single()
 
-  return nova
+  return { conversa: nova, novaConversa: true }
 }
 
 async function baixarEGuardarMidia(mediaId: string, conversaId: string): Promise<string | null> {
@@ -136,6 +136,33 @@ Deno.serve(async (req: Request) => {
     if (modo === 'subscribe' && token && token === Deno.env.get('WHATSAPP_VERIFY_TOKEN')) {
       return new Response(challenge ?? '', { status: 200 })
     }
+
+    // Inscreve o app pra receber eventos da WABA — passo separado da URL de callback,
+    // chamado uma vez (ou de novo, se trocar de WABA): GET .../whatsapp-webhook?subscribe_app=<WHATSAPP_VERIFY_TOKEN>
+    const subscribeSecret = url.searchParams.get('subscribe_app')
+    if (subscribeSecret && subscribeSecret === Deno.env.get('WHATSAPP_VERIFY_TOKEN')) {
+      const wabaId = Deno.env.get('WHATSAPP_WABA_ID')
+      const accessToken = Deno.env.get('WHATSAPP_ACCESS_TOKEN')
+      const res = await fetch(`https://graph.facebook.com/${GRAPH_API_VERSION}/${wabaId}/subscribed_apps`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}` },
+      })
+      const resultado = await res.json()
+      return new Response(JSON.stringify(resultado), { headers: { 'Content-Type': 'application/json' } })
+    }
+
+    // Diagnóstico: lista quem está de fato inscrito nessa WABA.
+    const checkSecret = url.searchParams.get('check_subscription')
+    if (checkSecret && checkSecret === Deno.env.get('WHATSAPP_VERIFY_TOKEN')) {
+      const wabaId = Deno.env.get('WHATSAPP_WABA_ID')
+      const accessToken = Deno.env.get('WHATSAPP_ACCESS_TOKEN')
+      const res = await fetch(`https://graph.facebook.com/${GRAPH_API_VERSION}/${wabaId}/subscribed_apps`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      })
+      const resultado = await res.json()
+      return new Response(JSON.stringify(resultado), { headers: { 'Content-Type': 'application/json' } })
+    }
+
     return new Response('forbidden', { status: 403 })
   }
 
@@ -162,6 +189,12 @@ Deno.serve(async (req: Request) => {
             image?: { id: string; mime_type?: string }
             document?: { id: string; mime_type?: string; filename?: string }
           }[]
+          statuses?: {
+            id: string
+            status: string
+            recipient_id?: string
+            errors?: { code?: number; title?: string; message?: string }[]
+          }[]
         }
       }[]
     }[]
@@ -175,8 +208,20 @@ Deno.serve(async (req: Request) => {
 
   for (const entry of payload.entry ?? []) {
     for (const change of entry.changes ?? []) {
-      if (change.field !== 'messages' || !change.value?.messages) continue
+      if (change.field !== 'messages') continue
       const valor = change.value
+
+      // Status de entrega das mensagens que a gente mandou — só avisa quando falha de verdade.
+      for (const status of valor?.statuses ?? []) {
+        if (status.status !== 'failed') continue
+        const erro = status.errors?.[0]
+        await enviarTextoTelegram(
+          `🔴 WhatsApp: mensagem ${status.id} falhou.\nMotivo: ${erro?.title ?? '-'}\n${erro?.message ?? ''}`,
+          'erros',
+        )
+      }
+
+      if (!valor?.messages) continue
       const numeroNegocio = valor.metadata?.display_phone_number ? normalizarTelefone(valor.metadata.display_phone_number) : null
 
       for (const msg of valor.messages ?? []) {
@@ -191,7 +236,7 @@ Deno.serve(async (req: Request) => {
         const ehEcoDoDanilo = numeroNegocio !== null && normalizarTelefone(msg.from) === numeroNegocio
 
         const leadId = await encontrarOuCriarLeadPorTelefone(telefoneCliente, contato?.profile?.name ?? null)
-        const conversa = await encontrarOuCriarConversa(telefoneCliente, leadId)
+        const { conversa, novaConversa } = await encontrarOuCriarConversa(telefoneCliente, leadId)
         if (!conversa) continue
 
         let texto: string | null = null
@@ -217,6 +262,11 @@ Deno.serve(async (req: Request) => {
             midia_url: midiaUrl,
             canal_msg_id: msg.id,
           })
+
+          // Primeira mensagem de uma conversa nova = o Danilo abrindo contato de propósito
+          // pra entregar pro bot (fluxo "mando o oi, dali pra frente o bot assume").
+          // Não pausa nesse caso — só pausa quando ele interrompe uma conversa já em andamento.
+          if (novaConversa) continue
 
           const { data: config } = await supabaseAdmin
             .from('bot_config')
