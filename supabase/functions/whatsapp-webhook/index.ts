@@ -283,6 +283,21 @@ Deno.serve(async (req: Request) => {
         }
 
         if (ehEcoDoDanilo) {
+          // Antes de inserir a mensagem dele, vê há quanto tempo a conversa estava parada —
+          // decide se isso é uma retomada (conversa dormente, bot assume direto) ou uma
+          // interrupção de verdade (conversa ativa, aí sim pausa).
+          let horasParada = Infinity
+          if (!novaConversa) {
+            const { data: ultimaMsg } = await supabaseAdmin
+              .from('mensagens')
+              .select('criado_em')
+              .eq('conversa_id', conversa.id)
+              .order('criado_em', { ascending: false })
+              .limit(1)
+              .maybeSingle()
+            if (ultimaMsg) horasParada = (Date.now() - new Date(ultimaMsg.criado_em).getTime()) / (60 * 60 * 1000)
+          }
+
           await supabaseAdmin.from('mensagens').insert({
             conversa_id: conversa.id,
             direcao: 'saida',
@@ -292,11 +307,6 @@ Deno.serve(async (req: Request) => {
             canal_msg_id: msg.id,
           })
 
-          // Primeira mensagem de uma conversa nova = o Danilo abrindo contato de propósito
-          // pra entregar pro bot (fluxo "mando o oi, dali pra frente o bot assume").
-          // Não pausa nesse caso — só pausa quando ele interrompe uma conversa já em andamento.
-          if (novaConversa) continue
-
           const { data: config } = await supabaseAdmin
             .from('bot_config')
             .select('horas_pausa_quando_humano')
@@ -305,6 +315,17 @@ Deno.serve(async (req: Request) => {
             .limit(1)
             .maybeSingle()
           const horas = config?.horas_pausa_quando_humano ?? 12
+
+          // Primeira mensagem de uma conversa nova, ou retomada de uma conversa que já
+          // estava com o bot e ficou parada por mais tempo que a janela de pausa = o
+          // Danilo abrindo/reabrindo contato de propósito pra entregar pro bot.
+          // Se a conversa já estava "humano" ou "pausado" por decisão (ex.: Danilo pediu
+          // pra manter manual com um lead específico), isso não muda sozinho com o tempo —
+          // só pausa de novo, esperando o "Religar bot" no CRM.
+          if (novaConversa || (conversa.estado === 'bot' && horasParada >= horas)) {
+            await supabaseAdmin.from('conversas').update({ estado: 'bot' }).eq('id', conversa.id)
+            continue
+          }
           const pausadoAte = new Date(Date.now() + horas * 60 * 60 * 1000).toISOString()
           await supabaseAdmin.from('conversas').update({ estado: 'humano', pausado_ate: pausadoAte }).eq('id', conversa.id)
           continue
