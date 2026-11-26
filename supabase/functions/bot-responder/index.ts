@@ -376,6 +376,23 @@ Deno.serve(async (req: Request) => {
     return jsonResponse(req, { ok: true, pulado: 'pausado' })
   }
 
+  // Trava: se mensagens picadas do lead disparam várias chamadas em paralelo, só a
+  // primeira pode seguir — as outras abortam aqui (a primeira já vai pegar tudo,
+  // porque esperarAgrupamento só avança depois de 30s sem mensagem nova).
+  // Lock "expira" sozinho depois de 3 min, pra não travar pra sempre se algo falhar no meio.
+  const { data: travou } = await supabaseAdmin
+    .from('conversas')
+    .update({ processando_desde: new Date().toISOString() })
+    .eq('id', conversaId)
+    .or(`processando_desde.is.null,processando_desde.lt.${new Date(Date.now() - 3 * 60 * 1000).toISOString()}`)
+    .select('id')
+    .maybeSingle()
+
+  if (!travou) {
+    return jsonResponse(req, { ok: true, pulado: 'ja_sendo_processada' })
+  }
+
+  try {
   await esperarAgrupamento(conversaId, conversa.canal)
 
   const { data: config } = await supabaseAdmin
@@ -559,4 +576,7 @@ Deno.serve(async (req: Request) => {
   await marcarLeadContatado(conversa.lead_id)
 
   return jsonResponse(req, { ok: true, mensagens: partes, ferramentas, avisos })
+  } finally {
+    await supabaseAdmin.from('conversas').update({ processando_desde: null }).eq('id', conversaId)
+  }
 })
