@@ -66,6 +66,14 @@ export async function encontrarOuCriarLead(dados: DadosLead): Promise<string | n
   return novoLead.id
 }
 
+// Deixa só os dígitos e garante o 55 na frente, pra comparar o telefone do
+// formulário (ex.: "(11) 99854-1993") com o wa_id que o WhatsApp manda (ex.: "5511998541993").
+export function normalizarTelefone(tel: string): string {
+  const digitos = tel.replace(/\D/g, '')
+  if (digitos.startsWith('55') && digitos.length >= 12) return digitos
+  return `55${digitos}`
+}
+
 // Chamado sempre que uma mensagem de verdade sai pro lead (bot, rascunho aprovado ou
 // sugestão enviada pelo Danilo) — garante que o card nunca fique parado em "novo"
 // esquecido, sem depender do modelo lembrar de chamar atualizar_etapa.
