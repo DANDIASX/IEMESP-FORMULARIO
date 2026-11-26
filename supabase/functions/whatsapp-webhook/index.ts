@@ -1,6 +1,7 @@
 import { supabaseAdmin } from '../_shared/supabaseAdmin.ts'
 import { enviarTextoTelegram } from '../_shared/notify.ts'
 import { normalizarTelefone } from '../_shared/leads.ts'
+import { enviarMensagemWhatsapp } from '../_shared/whatsapp.ts'
 
 const GRAPH_API_VERSION = 'v23.0'
 const BOT_RESPONDER_URL = 'https://qoxfkbytyvauhpoevaxp.supabase.co/functions/v1/bot-responder'
@@ -161,6 +162,34 @@ Deno.serve(async (req: Request) => {
       })
       const resultado = await res.json()
       return new Response(JSON.stringify(resultado), { headers: { 'Content-Type': 'application/json' } })
+    }
+
+    // Reenvia mensagens que ficaram sem canal_msg_id (falharam na hora, ex.: token vencido).
+    const resendSecret = url.searchParams.get('resend_pending')
+    const conversaIdResend = url.searchParams.get('conversa_id')
+    if (resendSecret && resendSecret === Deno.env.get('WHATSAPP_VERIFY_TOKEN') && conversaIdResend) {
+      const { data: conversa } = await supabaseAdmin
+        .from('conversas')
+        .select('contato_externo_id')
+        .eq('id', conversaIdResend)
+        .maybeSingle()
+
+      const { data: pendentes } = await supabaseAdmin
+        .from('mensagens')
+        .select('id, texto')
+        .eq('conversa_id', conversaIdResend)
+        .eq('direcao', 'saida')
+        .is('canal_msg_id', null)
+        .order('criado_em')
+
+      const resultados = []
+      for (const msg of pendentes ?? []) {
+        if (!conversa?.contato_externo_id || !msg.texto) continue
+        const envio = await enviarMensagemWhatsapp(conversa.contato_externo_id, msg.texto)
+        if (envio.ok) await supabaseAdmin.from('mensagens').update({ canal_msg_id: envio.id }).eq('id', msg.id)
+        resultados.push({ id: msg.id, envio })
+      }
+      return new Response(JSON.stringify(resultados), { headers: { 'Content-Type': 'application/json' } })
     }
 
     return new Response('forbidden', { status: 403 })
