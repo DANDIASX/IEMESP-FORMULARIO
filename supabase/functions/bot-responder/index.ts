@@ -441,7 +441,7 @@ Deno.serve(async (req: Request) => {
   const contextoLead = lead
     ? [
         '[CONTEXTO INTERNO — dados do formulário, não é mensagem do lead. Use sem perguntar de novo.]',
-        lead.nome ? `Nome: ${lead.nome}` : null,
+        lead.nome ? `Primeiro nome (use só este, nunca sobrenome): ${lead.nome.trim().split(/\s+/)[0]}` : null,
         lead.perfil ? `Perfil: ${lead.perfil}` : null,
         lead.curso_interesse ? `Curso de interesse: ${lead.curso_interesse}` : null,
         lead.turma_interesse ? `Turma de interesse: ${lead.turma_interesse}` : null,
